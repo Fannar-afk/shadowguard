@@ -1,0 +1,15 @@
+﻿{
+  "name": "shadowguard-demo-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-ecosystem sample project for ShadowGuard.",
+  "dependencies": {
+    "event-stream": "3.3.6",
+    "legacy-helper": "latest",
+    "internal-gateway": "git+https://github.com/example/internal-gateway.git",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "reactx": "18.2.0"
+  }
+}

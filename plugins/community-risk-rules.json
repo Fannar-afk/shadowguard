@@ -1,0 +1,32 @@
+﻿{
+  "pluginId": "community-risk-rules",
+  "displayName": "社区风险规则包",
+  "version": "1.0.0",
+  "author": "ShadowGuard Labs",
+  "description": "提供针对疑似抢注包和许可证审查场景的补充规则。",
+  "enabled": true,
+  "rules": [
+    {
+      "id": "plugin.typosquat.reactx",
+      "name": "疑似抢注依赖包",
+      "matchType": "RegexName",
+      "pattern": "^(reactx|reaact|lodasz)$",
+      "severity": "High",
+      "score": 72,
+      "category": "Malicious",
+      "message": "该依赖名称与常见热门组件高度相似，可能需要核验发布者身份。",
+      "recommendation": "请确认该软件包的发布者与来源是否可信，若为误用应切换为官方依赖。"
+    },
+    {
+      "id": "plugin.license.review",
+      "name": "许可证合规复核",
+      "matchType": "RegexName",
+      "pattern": "(agpl|gpl)",
+      "severity": "Medium",
+      "score": 45,
+      "category": "License",
+      "message": "该依赖名称提示可能涉及强传染性开源许可证，需要进一步审查。",
+      "recommendation": "请核验真实许可证条款，并在发布前完成法务或合规审批。"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+﻿lockfileVersion: '9.0'
+
+importers:
+  .:
+    dependencies:
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
+
+packages:
+  lodash@4.17.21:
+    resolution: {integrity: sha512-demo-lodash}
+  reactx@18.2.0:
+    resolution: {integrity: sha512-demo-reactx}
+  '@scope/telemetry-agent@1.2.0':
+    resolution: {integrity: sha512-demo-scope}

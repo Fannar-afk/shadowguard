@@ -1,0 +1,12 @@
+﻿{
+  "name": "example/shadowguard-demo",
+  "description": "Composer sample for ShadowGuard scanning",
+  "require": {
+    "monolog/monolog": "^3.7",
+    "acme/agpl-reports": "^1.4",
+    "php": "^8.2"
+  },
+  "require-dev": {
+    "pestphp/pest": "^2.36"
+  }
+}

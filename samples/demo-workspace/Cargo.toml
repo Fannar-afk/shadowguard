@@ -1,0 +1,10 @@
+﻿[package]
+name = "shadowguard-demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1.0.215"
+tokio = { version = "1.43.0", features = ["full"] }
+internal-bridge = { git = "https://github.com/example/internal-gateway.git" }
+local-crate = { path = "../local-crate" }

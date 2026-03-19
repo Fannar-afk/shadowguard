@@ -1,0 +1,11 @@
+﻿"event-stream@3.3.6":
+  version "3.3.6"
+  resolved "https://registry.yarnpkg.com/event-stream/-/event-stream-3.3.6.tgz"
+
+"internal-gateway@git+https://github.com/example/internal-gateway.git":
+  version "0.0.0-use.local"
+  resolved "git+https://github.com/example/internal-gateway.git"
+
+"flatmap-stream@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/flatmap-stream/-/flatmap-stream-0.1.1.tgz"
