@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace ShadowGuard;
@@ -59,6 +60,10 @@ public sealed class Finding
 
 public sealed class PluginRule
 {
+    private string? _normalizedMatchType;
+    private Regex? _cachedRegex;
+    private string? _cachedRegexPattern;
+
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string MatchType { get; set; } = "ExactName";
@@ -69,6 +74,12 @@ public sealed class PluginRule
     public string Message { get; set; } = string.Empty;
     public string Recommendation { get; set; } = string.Empty;
 
+    [JsonIgnore]
+    public string NormalizedMatchType => _normalizedMatchType ??= MatchType.Trim().ToLowerInvariant();
+
+    [JsonIgnore]
+    public bool UsesRegex => NormalizedMatchType is "regexname" or "versionpattern";
+
     public bool Matches(DependencyComponent component)
     {
         if (string.IsNullOrWhiteSpace(Pattern))
@@ -76,16 +87,28 @@ public sealed class PluginRule
             return false;
         }
 
-        return MatchType.Trim().ToLowerInvariant() switch
+        return NormalizedMatchType switch
         {
             "exactname" => string.Equals(component.Name, Pattern, StringComparison.OrdinalIgnoreCase),
             "containsname" => component.Name.Contains(Pattern, StringComparison.OrdinalIgnoreCase),
-            "regexname" => Regex.IsMatch(component.Name, Pattern, RegexOptions.IgnoreCase),
+            "regexname" => GetOrCreateRegex().IsMatch(component.Name),
             "sourcetype" => string.Equals(component.SourceType, Pattern, StringComparison.OrdinalIgnoreCase),
-            "versionpattern" => Regex.IsMatch(component.Version, Pattern, RegexOptions.IgnoreCase),
+            "versionpattern" => GetOrCreateRegex().IsMatch(component.Version),
             "ecosystem" => string.Equals(component.Ecosystem, Pattern, StringComparison.OrdinalIgnoreCase),
             _ => false
         };
+    }
+
+    private Regex GetOrCreateRegex()
+    {
+        if (_cachedRegex is not null && string.Equals(_cachedRegexPattern, Pattern, StringComparison.Ordinal))
+        {
+            return _cachedRegex;
+        }
+
+        _cachedRegexPattern = Pattern;
+        _cachedRegex = new Regex(Pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        return _cachedRegex;
     }
 }
 

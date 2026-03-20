@@ -4,6 +4,15 @@ namespace ShadowGuard;
 
 public sealed class RiskScoringService
 {
+    private static readonly string[] ApprovedRegistryHosts =
+    {
+        "registry.npmjs.org",
+        "files.pythonhosted.org",
+        "pypi.org",
+        "repo.maven.apache.org",
+        "api.nuget.org"
+    };
+
     private static readonly Dictionary<string, (SeverityLevel Severity, int Score, string Message, string Recommendation)> HistoricalIncidentPackages =
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -32,18 +41,28 @@ public sealed class RiskScoringService
     public ScanResult BuildResult(string targetPath, IEnumerable<DependencyComponent> components, IEnumerable<PluginDefinition> plugins)
     {
         var componentList = components.ToList();
-        var enabledRules = plugins.Where(plugin => plugin.Enabled).SelectMany(plugin => plugin.Rules).ToList();
+        var ruleIndex = BuildRuleIndex(plugins);
         var findings = new List<Finding>();
 
         foreach (var component in componentList)
         {
-            var componentFindings = AnalyzeComponent(component, enabledRules);
+            var componentFindings = AnalyzeComponent(component, ruleIndex);
             findings.AddRange(componentFindings);
 
             // Treat the strongest signal as the primary risk driver while still
             // letting multiple weaker findings raise the final component score.
-            var maxScore = componentFindings.Any() ? componentFindings.Max(finding => finding.Score) : 0;
-            var additionalScore = componentFindings.Sum(finding => finding.Score) - maxScore;
+            var maxScore = 0;
+            var totalScore = 0;
+            foreach (var finding in componentFindings)
+            {
+                totalScore += finding.Score;
+                if (finding.Score > maxScore)
+                {
+                    maxScore = finding.Score;
+                }
+            }
+
+            var additionalScore = totalScore - maxScore;
             component.RiskScore = Math.Min(100, maxScore + (additionalScore * 0.35));
             component.Severity = SeverityHelper.FromScore(component.RiskScore);
         }
@@ -62,7 +81,7 @@ public sealed class RiskScoringService
         };
     }
 
-    private static List<Finding> AnalyzeComponent(DependencyComponent component, IReadOnlyCollection<PluginRule> pluginRules)
+    private static List<Finding> AnalyzeComponent(DependencyComponent component, PluginRuleIndex ruleIndex)
     {
         var findings = new List<Finding>();
 
@@ -144,7 +163,7 @@ public sealed class RiskScoringService
                 "请核验发布者身份，并将制品镜像到可信的内部仓库。"));
         }
 
-        foreach (var rule in pluginRules)
+        foreach (var rule in ruleIndex.GetCandidateRules(component))
         {
             if (!rule.Matches(component))
             {
@@ -167,16 +186,15 @@ public sealed class RiskScoringService
 
     private static bool IsApprovedRegistry(string location)
     {
-        var approvedHosts = new[]
+        foreach (var host in ApprovedRegistryHosts)
         {
-            "registry.npmjs.org",
-            "files.pythonhosted.org",
-            "pypi.org",
-            "repo.maven.apache.org",
-            "api.nuget.org"
-        };
+            if (location.Contains(host, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
 
-        return approvedHosts.Any(host => location.Contains(host, StringComparison.OrdinalIgnoreCase));
+        return false;
     }
 
     private static Finding CreateFinding(DependencyComponent component, string ruleId, string ruleName, string category, SeverityLevel severity, int score, string message, string recommendation)
@@ -251,5 +269,93 @@ public sealed class RiskScoringService
                 EvidenceFiles = component.EvidenceFilesDisplay
             }).ToList()
         };
+    }
+
+    private static PluginRuleIndex BuildRuleIndex(IEnumerable<PluginDefinition> plugins)
+    {
+        var index = new PluginRuleIndex();
+
+        foreach (var rule in plugins.Where(plugin => plugin.Enabled).SelectMany(plugin => plugin.Rules))
+        {
+            if (string.IsNullOrWhiteSpace(rule.Pattern))
+            {
+                continue;
+            }
+
+            switch (rule.NormalizedMatchType)
+            {
+                case "exactname":
+                    index.ExactNameRules.Add(rule.Pattern, rule);
+                    break;
+                case "sourcetype":
+                    index.SourceTypeRules.Add(rule.Pattern, rule);
+                    break;
+                case "ecosystem":
+                    index.EcosystemRules.Add(rule.Pattern, rule);
+                    break;
+                default:
+                    index.GeneralRules.Add(rule);
+                    break;
+            }
+        }
+
+        return index;
+    }
+
+    private sealed class PluginRuleIndex
+    {
+        public Lookup<string, PluginRule> ExactNameRules { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Lookup<string, PluginRule> SourceTypeRules { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Lookup<string, PluginRule> EcosystemRules { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<PluginRule> GeneralRules { get; } = new();
+
+        public IEnumerable<PluginRule> GetCandidateRules(DependencyComponent component)
+        {
+            foreach (var rule in ExactNameRules.GetValues(component.Name))
+            {
+                yield return rule;
+            }
+
+            foreach (var rule in SourceTypeRules.GetValues(component.SourceType))
+            {
+                yield return rule;
+            }
+
+            foreach (var rule in EcosystemRules.GetValues(component.Ecosystem))
+            {
+                yield return rule;
+            }
+
+            foreach (var rule in GeneralRules)
+            {
+                yield return rule;
+            }
+        }
+    }
+
+    private sealed class Lookup<TKey, TValue> where TKey : notnull
+    {
+        private readonly Dictionary<TKey, List<TValue>> _entries;
+
+        public Lookup(IEqualityComparer<TKey>? comparer = null)
+        {
+            _entries = new Dictionary<TKey, List<TValue>>(comparer);
+        }
+
+        public void Add(TKey key, TValue value)
+        {
+            if (!_entries.TryGetValue(key, out var values))
+            {
+                values = new List<TValue>();
+                _entries[key] = values;
+            }
+
+            values.Add(value);
+        }
+
+        public IEnumerable<TValue> GetValues(TKey key)
+        {
+            return _entries.TryGetValue(key, out var values) ? values : Array.Empty<TValue>();
+        }
     }
 }
