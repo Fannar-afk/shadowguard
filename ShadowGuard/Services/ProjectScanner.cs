@@ -661,6 +661,7 @@ public sealed class ProjectScanner
     {
         candidate.BomReference = HashUtility.CreateBomReference(candidate.Name, candidate.Version, candidate.Ecosystem);
         candidate.PackageUrl = BuildPackageUrl(candidate);
+        candidate.EvidenceFilesDisplay = BuildEvidenceFilesDisplay(candidate.EvidenceFiles);
 
         var key = $"{candidate.Ecosystem}:{candidate.Name}:{candidate.Version}";
         if (!components.TryGetValue(key, out var existing))
@@ -687,6 +688,13 @@ public sealed class ProjectScanner
                 existing.EvidenceFiles.Add(evidenceFile);
             }
         }
+
+        existing.EvidenceFilesDisplay = BuildEvidenceFilesDisplay(existing.EvidenceFiles);
+    }
+
+    private static string BuildEvidenceFilesDisplay(IEnumerable<string> evidenceFiles)
+    {
+        return string.Join(", ", evidenceFiles.Distinct(StringComparer.OrdinalIgnoreCase));
     }
 
     private static string ExtractPackageName(string packagePath)

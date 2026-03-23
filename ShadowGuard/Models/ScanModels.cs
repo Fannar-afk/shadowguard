@@ -31,6 +31,7 @@ public sealed class DependencyComponent
     public string License { get; set; } = "Unknown";
     public string ResolvedLocation { get; set; } = string.Empty;
     public List<string> EvidenceFiles { get; set; } = new();
+    public string EvidenceFilesDisplay { get; set; } = string.Empty;
     public double RiskScore { get; set; }
     public SeverityLevel Severity { get; set; } = SeverityLevel.None;
     public string BomReference { get; set; } = string.Empty;
@@ -38,7 +39,6 @@ public sealed class DependencyComponent
     public string SeverityText => LocalizationHelper.ToChineseSeverity(Severity);
     public string SourceTypeText => LocalizationHelper.ToChineseSourceType(SourceType);
     public string DependencyTypeText => IsDirect ? "直接依赖" : "传递依赖";
-    public string EvidenceFilesDisplay => string.Join(", ", EvidenceFiles.Distinct(StringComparer.OrdinalIgnoreCase));
 }
 
 public sealed class Finding

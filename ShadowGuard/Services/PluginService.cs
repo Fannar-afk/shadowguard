@@ -20,7 +20,8 @@ public sealed class PluginService
         {
             try
             {
-                var plugin = JsonSerializer.Deserialize<PluginDefinition>(File.ReadAllText(file), JsonOptions);
+                using var stream = File.OpenRead(file);
+                var plugin = JsonSerializer.Deserialize<PluginDefinition>(stream, JsonOptions);
                 if (plugin is null)
                 {
                     continue;
