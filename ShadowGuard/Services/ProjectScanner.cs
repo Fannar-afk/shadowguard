@@ -31,20 +31,30 @@ public sealed class ProjectScanner
         "__pycache__"
     };
 
+    private static readonly Regex PnpmSectionEntryRegex = new("^  (?<key>.+):\\s*$", RegexOptions.Compiled);
+    private static readonly Regex Pep508RequirementRegex = new("^(?<name>[A-Za-z0-9_.\\-]+)\\s*@\\s*(?<source>.+)$", RegexOptions.Compiled);
+    private static readonly Regex VersionedRequirementRegex = new("^(?<name>[A-Za-z0-9_.\\-]+)\\s*(?<operator>==|>=|<=|~=|>|<)?\\s*(?<version>.*)$", RegexOptions.Compiled);
+    private static readonly Regex WhitespaceRegex = new("\\s+", RegexOptions.Compiled);
+    private static readonly Regex CargoVersionRegex = new("version\\s*=\\s*\"(?<version>[^\"]+)\"", RegexOptions.Compiled);
+    private static readonly Regex CargoGitRegex = new("git\\s*=\\s*\"(?<git>[^\"]+)\"", RegexOptions.Compiled);
+    private static readonly Regex CargoPathRegex = new("path\\s*=\\s*\"(?<path>[^\"]+)\"", RegexOptions.Compiled);
+    private static readonly Regex QuotedValueRegex = new("\"(?<value>[^\"]+)\"", RegexOptions.Compiled);
+
     public List<DependencyComponent> DiscoverComponents(string targetPath)
     {
         var components = new Dictionary<string, DependencyComponent>(StringComparer.OrdinalIgnoreCase);
+        var manifests = CatalogManifestFiles(targetPath);
 
-        ScanPackageJson(targetPath, components);
-        ScanPackageLock(targetPath, components);
-        ScanYarnLockFiles(targetPath, components);
-        ScanPnpmLockFiles(targetPath, components);
-        ScanRequirements(targetPath, components);
-        ScanGoModFiles(targetPath, components);
-        ScanCargoTomlFiles(targetPath, components);
-        ScanComposerJsonFiles(targetPath, components);
-        ScanPomFiles(targetPath, components);
-        ScanCsprojFiles(targetPath, components);
+        ScanPackageJson(manifests.PackageJsonFiles, components);
+        ScanPackageLock(manifests.PackageLockFiles, components);
+        ScanYarnLockFiles(manifests.YarnLockFiles, components);
+        ScanPnpmLockFiles(manifests.PnpmLockFiles, components);
+        ScanRequirements(manifests.RequirementsFiles, components);
+        ScanGoModFiles(manifests.GoModFiles, components);
+        ScanCargoTomlFiles(manifests.CargoTomlFiles, components);
+        ScanComposerJsonFiles(manifests.ComposerJsonFiles, components);
+        ScanPomFiles(manifests.PomFiles, components);
+        ScanCsprojFiles(manifests.CsprojFiles, components);
 
         return components.Values
             .OrderBy(component => component.Ecosystem, StringComparer.OrdinalIgnoreCase)
@@ -52,13 +62,14 @@ public sealed class ProjectScanner
             .ToList();
     }
 
-    private static void ScanPackageJson(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanPackageJson(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "package.json"))
+        foreach (var file in files)
         {
             try
             {
-                using var document = JsonDocument.Parse(File.ReadAllText(file));
+                using var stream = File.OpenRead(file);
+                using var document = JsonDocument.Parse(stream);
                 var root = document.RootElement;
                 ParseNpmDependencyBlock(root, "dependencies", file, true, components);
                 ParseNpmDependencyBlock(root, "devDependencies", file, true, components);
@@ -94,13 +105,14 @@ public sealed class ProjectScanner
         }
     }
 
-    private static void ScanPackageLock(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanPackageLock(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "package-lock.json"))
+        foreach (var file in files)
         {
             try
             {
-                using var document = JsonDocument.Parse(File.ReadAllText(file));
+                using var stream = File.OpenRead(file);
+                using var document = JsonDocument.Parse(stream);
                 var root = document.RootElement;
 
                 if (root.TryGetProperty("packages", out var packages) && packages.ValueKind == JsonValueKind.Object)
@@ -179,9 +191,9 @@ public sealed class ProjectScanner
         }
     }
 
-    private static void ScanYarnLockFiles(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanYarnLockFiles(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "yarn.lock"))
+        foreach (var file in files)
         {
             string? currentName = null;
             string version = string.Empty;
@@ -208,8 +220,13 @@ public sealed class ProjectScanner
                     });
             }
 
-            foreach (var rawLine in File.ReadAllLines(file))
+            foreach (var rawLine in File.ReadLines(file))
             {
+                if (string.IsNullOrEmpty(rawLine))
+                {
+                    continue;
+                }
+
                 var line = rawLine.TrimEnd();
                 if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
                 {
@@ -245,13 +262,13 @@ public sealed class ProjectScanner
         }
     }
 
-    private static void ScanPnpmLockFiles(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanPnpmLockFiles(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "pnpm-lock.yaml"))
+        foreach (var file in files)
         {
             var inPackagesSection = false;
 
-            foreach (var rawLine in File.ReadAllLines(file))
+            foreach (var rawLine in File.ReadLines(file))
             {
                 var line = rawLine.TrimEnd();
                 var trimmed = line.Trim();
@@ -272,7 +289,7 @@ public sealed class ProjectScanner
                     continue;
                 }
 
-                var match = Regex.Match(rawLine, "^  (?<key>.+):\\s*$");
+                var match = PnpmSectionEntryRegex.Match(rawLine);
                 if (!match.Success)
                 {
                     continue;
@@ -299,11 +316,11 @@ public sealed class ProjectScanner
         }
     }
 
-    private static void ScanRequirements(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanRequirements(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "requirements*.txt"))
+        foreach (var file in files)
         {
-            foreach (var rawLine in File.ReadAllLines(file))
+            foreach (var rawLine in File.ReadLines(file))
             {
                 var line = rawLine.Trim();
                 if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || line.StartsWith("-"))
@@ -322,7 +339,7 @@ public sealed class ProjectScanner
 
     private static DependencyComponent? ParseRequirementLine(string line, string evidenceFile)
     {
-        var pep508 = Regex.Match(line, @"^(?<name>[A-Za-z0-9_.\-]+)\s*@\s*(?<source>.+)$");
+        var pep508 = Pep508RequirementRegex.Match(line);
         if (pep508.Success)
         {
             return new DependencyComponent
@@ -336,7 +353,7 @@ public sealed class ProjectScanner
             };
         }
 
-        var versionMatch = Regex.Match(line, @"^(?<name>[A-Za-z0-9_.\-]+)\s*(?<operator>==|>=|<=|~=|>|<)?\s*(?<version>.*)$");
+        var versionMatch = VersionedRequirementRegex.Match(line);
         if (!versionMatch.Success)
         {
             return null;
@@ -357,12 +374,12 @@ public sealed class ProjectScanner
         };
     }
 
-    private static void ScanGoModFiles(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanGoModFiles(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "go.mod"))
+        foreach (var file in files)
         {
             var inRequireBlock = false;
-            foreach (var rawLine in File.ReadAllLines(file))
+            foreach (var rawLine in File.ReadLines(file))
             {
                 var trimmed = rawLine.Trim();
                 if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("//", StringComparison.Ordinal))
@@ -408,7 +425,7 @@ public sealed class ProjectScanner
     private static DependencyComponent? ParseGoRequireLine(string line, string evidenceFile, bool indirect)
     {
         var clean = line.Split("//", 2, StringSplitOptions.None)[0].Trim();
-        var parts = Regex.Split(clean, @"\s+");
+        var parts = WhitespaceRegex.Split(clean);
         if (parts.Length < 2)
         {
             return null;
@@ -425,12 +442,12 @@ public sealed class ProjectScanner
         };
     }
 
-    private static void ScanCargoTomlFiles(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanCargoTomlFiles(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "Cargo.toml"))
+        foreach (var file in files)
         {
             string currentSection = string.Empty;
-            foreach (var rawLine in File.ReadAllLines(file))
+            foreach (var rawLine in File.ReadLines(file))
             {
                 var trimmed = rawLine.Trim();
                 if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith('#'))
@@ -482,9 +499,9 @@ public sealed class ProjectScanner
         }
         else
         {
-            version = Regex.Match(value, "version\\s*=\\s*\"(?<version>[^\"]+)\"").Groups["version"].Value;
-            var gitSource = Regex.Match(value, "git\\s*=\\s*\"(?<git>[^\"]+)\"").Groups["git"].Value;
-            var pathSource = Regex.Match(value, "path\\s*=\\s*\"(?<path>[^\"]+)\"").Groups["path"].Value;
+            version = CargoVersionRegex.Match(value).Groups["version"].Value;
+            var gitSource = CargoGitRegex.Match(value).Groups["git"].Value;
+            var pathSource = CargoPathRegex.Match(value).Groups["path"].Value;
             source = !string.IsNullOrWhiteSpace(gitSource) ? gitSource : !string.IsNullOrWhiteSpace(pathSource) ? pathSource : value;
         }
 
@@ -514,13 +531,14 @@ public sealed class ProjectScanner
             || normalized.EndsWith(".build-dependencies]", StringComparison.Ordinal);
     }
 
-    private static void ScanComposerJsonFiles(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanComposerJsonFiles(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "composer.json"))
+        foreach (var file in files)
         {
             try
             {
-                using var document = JsonDocument.Parse(File.ReadAllText(file));
+                using var stream = File.OpenRead(file);
+                using var document = JsonDocument.Parse(stream);
                 var root = document.RootElement;
                 ParseComposerDependencyBlock(root, "require", file, components);
                 ParseComposerDependencyBlock(root, "require-dev", file, components);
@@ -568,9 +586,9 @@ public sealed class ProjectScanner
             || string.Equals(packageName, "composer-runtime-api", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void ScanPomFiles(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanPomFiles(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "pom.xml"))
+        foreach (var file in files)
         {
             try
             {
@@ -604,9 +622,9 @@ public sealed class ProjectScanner
         }
     }
 
-    private static void ScanCsprojFiles(string targetPath, IDictionary<string, DependencyComponent> components)
+    private static void ScanCsprojFiles(IEnumerable<string> files, IDictionary<string, DependencyComponent> components)
     {
-        foreach (var file in EnumerateManifestFiles(targetPath, "*.csproj"))
+        foreach (var file in files)
         {
             try
             {
@@ -753,7 +771,7 @@ public sealed class ProjectScanner
 
     private static string ExtractQuotedValue(string text)
     {
-        var match = Regex.Match(text, "\"(?<value>[^\"]+)\"");
+        var match = QuotedValueRegex.Match(text);
         return match.Success ? match.Groups["value"].Value : text;
     }
 
@@ -769,21 +787,22 @@ public sealed class ProjectScanner
         return !remaining.Contains("/node_modules/", StringComparison.OrdinalIgnoreCase);
     }
 
-    // Custom traversal keeps the scan focused on the user's project instead of
-    // recursively reading downloaded dependencies or generated build output.
-    private static IEnumerable<string> EnumerateManifestFiles(string targetPath, string searchPattern)
+    // A single traversal avoids re-walking the same tree for every manifest type.
+    private static ManifestFileCatalog CatalogManifestFiles(string targetPath)
     {
+        var catalog = new ManifestFileCatalog();
         var pendingDirectories = new Stack<string>();
         pendingDirectories.Push(targetPath);
 
         while (pendingDirectories.Count > 0)
         {
             var currentDirectory = pendingDirectories.Pop();
-            IEnumerable<string> files;
-
             try
             {
-                files = Directory.EnumerateFiles(currentDirectory, searchPattern, SearchOption.TopDirectoryOnly);
+                foreach (var file in Directory.EnumerateFiles(currentDirectory, "*", SearchOption.TopDirectoryOnly))
+                {
+                    catalog.Add(file);
+                }
             }
             catch (IOException)
             {
@@ -792,11 +811,6 @@ public sealed class ProjectScanner
             catch (UnauthorizedAccessException)
             {
                 continue;
-            }
-
-            foreach (var file in files)
-            {
-                yield return file;
             }
 
             IEnumerable<string> directories;
@@ -823,6 +837,8 @@ public sealed class ProjectScanner
                 pendingDirectories.Push(directory);
             }
         }
+
+        return catalog;
     }
 
     private static bool ShouldSkipDirectory(string directoryPath)
@@ -908,6 +924,63 @@ public sealed class ProjectScanner
 
         var parts = component.Name.Split(':', 2);
         return $"pkg:maven/{parts[0]}/{parts[1]}@{component.Version}";
+    }
+
+    private sealed class ManifestFileCatalog
+    {
+        public List<string> PackageJsonFiles { get; } = new();
+        public List<string> PackageLockFiles { get; } = new();
+        public List<string> YarnLockFiles { get; } = new();
+        public List<string> PnpmLockFiles { get; } = new();
+        public List<string> RequirementsFiles { get; } = new();
+        public List<string> GoModFiles { get; } = new();
+        public List<string> CargoTomlFiles { get; } = new();
+        public List<string> ComposerJsonFiles { get; } = new();
+        public List<string> PomFiles { get; } = new();
+        public List<string> CsprojFiles { get; } = new();
+
+        public void Add(string filePath)
+        {
+            var fileName = Path.GetFileName(filePath);
+            switch (fileName)
+            {
+                case "package.json":
+                    PackageJsonFiles.Add(filePath);
+                    break;
+                case "package-lock.json":
+                    PackageLockFiles.Add(filePath);
+                    break;
+                case "yarn.lock":
+                    YarnLockFiles.Add(filePath);
+                    break;
+                case "pnpm-lock.yaml":
+                    PnpmLockFiles.Add(filePath);
+                    break;
+                case "go.mod":
+                    GoModFiles.Add(filePath);
+                    break;
+                case "Cargo.toml":
+                    CargoTomlFiles.Add(filePath);
+                    break;
+                case "composer.json":
+                    ComposerJsonFiles.Add(filePath);
+                    break;
+                case "pom.xml":
+                    PomFiles.Add(filePath);
+                    break;
+            }
+
+            if (fileName.StartsWith("requirements", StringComparison.OrdinalIgnoreCase)
+                && fileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+            {
+                RequirementsFiles.Add(filePath);
+            }
+
+            if (fileName.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+            {
+                CsprojFiles.Add(filePath);
+            }
+        }
     }
 }
 
