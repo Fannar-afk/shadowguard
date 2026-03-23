@@ -2,7 +2,7 @@
 
 ShadowGuard 是一个基于 .NET 6 WPF 构建的桌面端供应链安全工作台，用于在本地开发、联调和发布前扫描项目依赖，识别风险，生成 SBOM，并给出安全闸门结论。
 
-它面向的不是“事后审计”场景，而是研发过程中的“构建前安全关口”。开发、安全、测试和运维人员可以在同一个界面中完成依赖检查、风险分析、策略判断和结果导出。
+它并非面向“事后审计”场景，而是面向研发流程中的“构建前安全关口”。开发、安全、测试和运维人员可以在同一个界面中完成依赖检查、风险分析、策略判断和结果导出。
 
 ## 目录
 
@@ -22,11 +22,11 @@ ShadowGuard 是一个基于 .NET 6 WPF 构建的桌面端供应链安全工作�
 
 ShadowGuard 的目标是帮助用户在本地尽早发现依赖风险，减少恶意包、来源不可信包、版本未固定包、预发布包等问题进入测试和发布流程。
 
-项目当前提供以下价值：
+当前版本提供以下价值：
 
 - 统一扫描多种生态的依赖清单
 - 识别风险并输出处理建议
-- 生成 CycloneDX 风格 SBOM
+- 生成 CycloneDX 风格的 SBOM
 - 根据策略输出通过、告警或阻断结论
 - 通过插件规则扩展检测能力
 - 导出扫描报告与 SBOM 文件
@@ -45,7 +45,7 @@ ShadowGuard 的目标是帮助用户在本地尽早发现依赖风险，减少�
 
 - 对单个组件计算风险分
 - 对项目整体计算综合风险分和风险等级
-- 内置历史供应链事件包规则
+- 内置历史供应链事件规则集
 - 检测未固定版本、预发布版本、可疑来源等常见风险信号
 
 ### 3. SBOM 生成与导出
@@ -58,7 +58,7 @@ ShadowGuard 的目标是帮助用户在本地尽早发现依赖风险，减少�
 
 - 根据综合风险阈值输出闸门结论
 - 支持按恶意依赖、许可证风险等条件阻断
-- 输出 Pass、Warn、Block 三类结论
+- 输出 `Pass`、`Warn`、`Block` 三类结论
 - 显示触发策略和结论说明
 
 ### 5. 插件扩展
@@ -68,7 +68,7 @@ ShadowGuard 的目标是帮助用户在本地尽早发现依赖风险，减少�
 - 支持重新加载插件规则
 - 可扩展新的名称、版本、来源和生态检测规则
 
-### 6. 报告导出与样例演示
+### 6. 报告导出与示例演示
 
 - 支持导出完整扫描报告
 - 支持导出 SBOM 文件
@@ -108,7 +108,7 @@ ShadowGuard 的目标是帮助用户在本地尽早发现依赖风险，减少�
 确保当前工作目录为项目根目录：
 
 ```powershell
-cd d:\shadowguard
+cd d:\CProgram\shadowguard
 ```
 
 ### 2. 配置运行环境
@@ -116,10 +116,10 @@ cd d:\shadowguard
 建议在 PowerShell 中设置以下环境变量：
 
 ```powershell
-$env:DOTNET_CLI_HOME='d:\shadowguard\.dotnet'
+$env:DOTNET_CLI_HOME='d:\CProgram\shadowguard\.dotnet'
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
-$env:LOCALAPPDATA='d:\shadowguard\.localappdata'
-$env:APPDATA='d:\shadowguard\.localappdata'
+$env:LOCALAPPDATA='d:\CProgram\shadowguard\.localappdata'
+$env:APPDATA='d:\CProgram\shadowguard\.localappdata'
 ```
 
 这些变量用于将缓存和本地数据限制在项目目录下，便于演示、打包和验收。
@@ -147,7 +147,7 @@ dotnet run --project .\ShadowGuard\ShadowGuard.csproj
 如果需要生成发布版单文件程序，可执行：
 
 ```powershell
-$env:DOTNET_CLI_HOME='d:\shadowguard\.dotnet'
+$env:DOTNET_CLI_HOME='d:\CProgram\shadowguard\.dotnet'
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
 
 dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
@@ -255,7 +255,6 @@ shadowguard/
 ├─ tools/                       辅助脚本
 ├─ README.md                    项目说明文档
 ├─ TESTING.md                   构建与验证记录
-├─ REQUIREMENTS_CHECK.md        验收要求核对说明
 └─ shadowguard.sln              解决方案文件
 ```
 
@@ -268,7 +267,7 @@ shadowguard/
 - `MainWindow.xaml.cs`
   负责按钮事件、交互逻辑、扫描触发和导出操作。
 - `Services/ProjectScanner.cs`
-  负责解析多生态依赖清单并抽取组件信息。
+  负责解析多生态依赖清单并提取组件信息。
 - `Services/RiskScoringService.cs`
   负责生成风险发现、组件风险分和项目综合风险。
 - `Services/GateDecisionService.cs`
@@ -302,8 +301,6 @@ shadowguard/
 
 - `TESTING.md`
   构建、启动和代码审查验证记录。
-- `REQUIREMENTS_CHECK.md`
-  对照验收要求的逐条说明。
 - `samples/README.md`
   示例项目说明。
 - `tools/Count-CodeLines.ps1`
