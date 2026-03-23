@@ -217,12 +217,51 @@ public sealed class RiskScoringService
 
     private static ScanSummary BuildSummary(IReadOnlyCollection<DependencyComponent> components, IReadOnlyCollection<Finding> findings)
     {
-        var directDependencies = components.Count(component => component.IsDirect);
+        var directDependencies = 0;
+        foreach (var component in components)
+        {
+            if (component.IsDirect)
+            {
+                directDependencies++;
+            }
+        }
+
+        var maxFindingScore = 0;
+        var totalFindingScore = 0;
+        var criticalCount = 0;
+        var highCount = 0;
+        var mediumCount = 0;
+        var lowCount = 0;
+
+        foreach (var finding in findings)
+        {
+            totalFindingScore += finding.Score;
+            if (finding.Score > maxFindingScore)
+            {
+                maxFindingScore = finding.Score;
+            }
+
+            switch (finding.Severity)
+            {
+                case SeverityLevel.Critical:
+                    criticalCount++;
+                    break;
+                case SeverityLevel.High:
+                    highCount++;
+                    break;
+                case SeverityLevel.Medium:
+                    mediumCount++;
+                    break;
+                case SeverityLevel.Low:
+                    lowCount++;
+                    break;
+            }
+        }
 
         // Project-level risk favors the highest finding, then blends in the
         // overall finding density so one noisy component does not dominate alone.
-        var totalScore = findings.Any()
-            ? Math.Min(100, (int)Math.Round(findings.Max(finding => finding.Score) * 0.65 + findings.Sum(finding => finding.Score) / Math.Max(1.0, components.Count * 3.2)))
+        var totalScore = findings.Count > 0
+            ? Math.Min(100, (int)Math.Round(maxFindingScore * 0.65 + totalFindingScore / Math.Max(1.0, components.Count * 3.2)))
             : 0;
 
         return new ScanSummary
@@ -231,10 +270,10 @@ public sealed class RiskScoringService
             DirectDependencies = directDependencies,
             TransitiveDependencies = Math.Max(0, components.Count - directDependencies),
             FindingsCount = findings.Count,
-            CriticalCount = findings.Count(finding => finding.Severity == SeverityLevel.Critical),
-            HighCount = findings.Count(finding => finding.Severity == SeverityLevel.High),
-            MediumCount = findings.Count(finding => finding.Severity == SeverityLevel.Medium),
-            LowCount = findings.Count(finding => finding.Severity == SeverityLevel.Low),
+            CriticalCount = criticalCount,
+            HighCount = highCount,
+            MediumCount = mediumCount,
+            LowCount = lowCount,
             OverallScore = totalScore,
             OverallSeverity = SeverityHelper.FromScore(totalScore)
         };

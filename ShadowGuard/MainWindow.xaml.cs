@@ -66,11 +66,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         LoadPlugins();
     }
 
-    public ObservableCollection<Finding> Findings { get; } = new();
-    public ObservableCollection<DependencyComponent> Components { get; } = new();
-    public ObservableCollection<PluginDefinition> Plugins { get; } = new();
-    public ObservableCollection<Finding> TopFindings { get; } = new();
-    public ObservableCollection<string> GateTriggers { get; } = new();
+    public RangeObservableCollection<Finding> Findings { get; } = new();
+    public RangeObservableCollection<DependencyComponent> Components { get; } = new();
+    public RangeObservableCollection<PluginDefinition> Plugins { get; } = new();
+    public RangeObservableCollection<Finding> TopFindings { get; } = new();
+    public RangeObservableCollection<string> GateTriggers { get; } = new();
 
     public ICollectionView FindingsView { get; }
     public ICollectionView ComponentsView { get; }
@@ -406,12 +406,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             plugin.PropertyChanged -= Plugin_PropertyChanged;
         }
 
-        Plugins.Clear();
-        foreach (var plugin in _pluginService.LoadPlugins(_pluginDirectory))
+        var plugins = _pluginService.LoadPlugins(_pluginDirectory);
+        foreach (var plugin in plugins)
         {
             plugin.PropertyChanged += Plugin_PropertyChanged;
-            Plugins.Add(plugin);
         }
+
+        Plugins.ReplaceRange(plugins);
 
         OnPropertyChanged(nameof(EnabledPluginCount));
     }
@@ -427,10 +428,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void ApplyResult(ScanResult result)
     {
-        ReplaceItems(Findings, result.Findings);
-        ReplaceItems(Components, result.Components);
-        ReplaceItems(TopFindings, result.Findings.Take(5).ToList());
-        ReplaceItems(GateTriggers, result.GateDecision.TriggeredPolicies);
+        using (FindingsView.DeferRefresh())
+        {
+            Findings.ReplaceRange(result.Findings);
+        }
+
+        using (ComponentsView.DeferRefresh())
+        {
+            Components.ReplaceRange(result.Components);
+        }
+
+        TopFindings.ReplaceRange(result.Findings.Take(5));
+        GateTriggers.ReplaceRange(result.GateDecision.TriggeredPolicies);
 
         SelectedProjectName = new DirectoryInfo(result.TargetPath).Name;
         LastScanAt = result.ScannedAt.ToString("yyyy-MM-dd HH:mm:ss");
@@ -445,18 +454,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         GateOutcomeText = LocalizationHelper.ToChineseGateOutcome(result.GateDecision.Outcome);
         GateReasonText = result.GateDecision.Reason;
         SbomPreview = JsonSerializer.Serialize(result.Sbom, _jsonOptions);
-
-        FindingsView.Refresh();
-        ComponentsView.Refresh();
-    }
-
-    private static void ReplaceItems<T>(ObservableCollection<T> collection, IEnumerable<T> items)
-    {
-        collection.Clear();
-        foreach (var item in items)
-        {
-            collection.Add(item);
-        }
     }
 
     private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

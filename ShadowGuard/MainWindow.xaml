@@ -57,14 +57,19 @@
       <Setter Property="AutoGenerateColumns" Value="False" />
       <Setter Property="CanUserAddRows" Value="False" />
       <Setter Property="CanUserDeleteRows" Value="False" />
+      <Setter Property="EnableRowVirtualization" Value="True" />
+      <Setter Property="EnableColumnVirtualization" Value="True" />
       <Setter Property="HeadersVisibility" Value="Column" />
       <Setter Property="GridLinesVisibility" Value="Horizontal" />
       <Setter Property="RowHeaderWidth" Value="0" />
+      <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
       <Setter Property="AlternatingRowBackground" Value="#FAF4EE" />
       <Setter Property="Background" Value="White" />
       <Setter Property="BorderBrush" Value="#E3D8CB" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="FontSize" Value="12" />
+      <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+      <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
       <Setter Property="ColumnHeaderStyle">
         <Setter.Value>
           <Style TargetType="DataGridColumnHeader">
