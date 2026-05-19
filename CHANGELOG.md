@@ -1,23 +1,23 @@
-# Changelog
+# 变更日志
 
 ## Unreleased
 
-### Added
+### 新增
 
-- Added MIT License.
-- Added security policy in `SECURITY.md`.
-- Added third-party notices in `THIRD_PARTY_NOTICES.md`.
-- Added demo workspace case study in `case-studies/demo-workspace-scan.md`.
-- Added Windows GitHub Actions CI workflow.
-- Added Windows installer script under `package/`.
-- Added CI artifact uploads for the Windows installer and portable win-x64 build.
-- Added lightweight verification project `ShadowGuard.Tests` for core behavior smoke checks.
-- Added `CONTRIBUTING.md` with build and contribution guidance.
+- 新增 MIT License。
+- 新增 `SECURITY.md`，说明安全边界和漏洞反馈方式。
+- 新增 `THIRD_PARTY_NOTICES.md`，记录第三方依赖与许可证信息。
+- 新增 `case-studies/demo-workspace-scan.md`，展示示例工作区扫描流程。
+- 新增 GitHub Actions CI 工作流。
+- 新增 `package/ShadowGuard.iss`，支持使用 Inno Setup 生成 Windows 安装包。
+- 新增 CI 构建产物上传，包括 Windows 安装包和 win-x64 便携版。
+- 新增 `ShadowGuard.Tests` 轻量级行为验证项目。
+- 新增 `CONTRIBUTING.md`，说明构建、验证和贡献流程。
 
-### Changed
+### 变更
 
-- Rewrote `README.md` as normal project documentation with installation, usage, plugin, build, packaging, architecture, development, security, and license sections.
+- 优化 README，补充项目介绍、功能特性、安装方式、源码构建、安装包生成、使用方法、插件规则、技术架构、开发验证、安全说明和许可证信息。
 
-### Notes
+### 说明
 
-The lightweight verification project intentionally avoids external test framework packages so that this update does not introduce additional third-party package license considerations.
+`ShadowGuard.Tests` 当前采用轻量级控制台验证方式，避免为基础行为检查引入额外测试框架依赖。
