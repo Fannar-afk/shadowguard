@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - chore/acceptance-hardening
+    tags:
+      - 'v*'
   pull_request:
     branches:
       - main
@@ -37,4 +39,36 @@ jobs:
         run: .\tools\Count-CodeLines.ps1
 
       - name: Publish win-x64
-        run: dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
+        run: dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\artifacts\publish
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path .\artifacts\installer | Out-Null
+          $env:SHADOWGUARD_VERSION = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '1.0.0-ci' }
+          $env:SHADOWGUARD_PUBLISH_DIR = (Resolve-Path .\artifacts\publish).Path
+          $env:SHADOWGUARD_OUTPUT_DIR = (Resolve-Path .\artifacts\installer).Path
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\package\ShadowGuard.iss
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShadowGuard-Setup
+          path: .\artifacts\installer\ShadowGuard-Setup.exe
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShadowGuard-portable-win-x64
+          path: .\artifacts\publish\**
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/installer/ShadowGuard-Setup.exe

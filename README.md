@@ -1,86 +1,25 @@
 # ShadowGuard
 
-ShadowGuard 是一个基于 .NET 6 WPF 构建的桌面端供应链安全工作台，用于在本地开发、联调和发布前扫描项目依赖，识别风险，生成 SBOM，并给出安全闸门结论。
+ShadowGuard is a Windows desktop supply-chain security workbench built with .NET 6 and WPF. It helps developers inspect project dependency manifests before release, identify risky packages, generate SBOM data, and make a simple pass/warn/block gate decision from one local UI.
 
-它面向的不是“事后审计”场景，而是研发过程中的“构建前安全关口”。开发、安全、测试和运维人员可以在同一个界面中完成依赖检查、风险分析、策略判断和结果导出。
+The application is designed for local development and pre-release checks. It does not execute code from the scanned project and does not modify the project being scanned.
 
-## 目录
+## Features
 
-- [项目简介](#项目简介)
-- [核心功能](#核心功能)
-- [支持的依赖清单](#支持的依赖清单)
-- [运行环境](#运行环境)
-- [安装与运行](#安装与运行)
-- [使用方法](#使用方法)
-- [插件机制](#插件机制)
-- [项目结构](#项目结构)
-- [技术架构](#技术架构)
-- [安全说明](#安全说明)
-- [验证与文档](#验证与文档)
+- **Multi-ecosystem dependency discovery**: scans common manifest and lock files across npm, Python, Go, Rust, PHP, Java, and .NET projects.
+- **Risk findings**: detects suspicious package sources, unpinned versions, pre-release versions, and selected historical supply-chain incident packages.
+- **Project risk summary**: calculates component-level and project-level risk scores.
+- **SBOM export**: generates CycloneDX-style SBOM JSON with component metadata, PURL, source type, risk score, and evidence files.
+- **Security gate**: returns `Pass`, `Warn`, or `Block` based on policy settings.
+- **Plugin rules**: loads JSON rule packs from the local `plugins/` directory.
+- **Reports**: exports scan reports and SBOM files from the desktop UI.
+- **Installer build**: CI can build a Windows installer and a portable win-x64 package.
 
-## 项目简介
+## Supported Manifest Files
 
-ShadowGuard 的目标是帮助用户在本地尽早发现依赖风险，减少恶意包、来源不可信包、版本未固定包、预发布包等问题进入测试和发布流程。
-
-项目当前提供以下价值：
-
-- 统一扫描多种生态的依赖清单
-- 识别风险并输出处理建议
-- 生成 CycloneDX 风格 SBOM
-- 根据策略输出通过、告警或阻断结论
-- 通过插件规则扩展检测能力
-- 导出扫描报告与 SBOM 文件
-
-## 核心功能
-
-### 1. 依赖扫描与风险发现
-
-- 递归扫描项目目录中的依赖清单文件
-- 识别直接依赖和传递依赖
-- 标记来源类型，例如仓库、Git、URL、本地路径
-- 展示风险等级、风险说明、处理建议和证据文件
-- 提供搜索和筛选能力，便于定位重点风险
-
-### 2. 风险评分与综合评估
-
-- 对单个组件计算风险分
-- 对项目整体计算综合风险分和风险等级
-- 内置历史供应链事件包规则
-- 检测未固定版本、预发布版本、可疑来源等常见风险信号
-
-### 3. SBOM 生成与导出
-
-- 生成 CycloneDX 1.5 风格的 SBOM 数据
-- 展示组件清单、PURL、作用域、风险分等信息
-- 支持导出 SBOM JSON 文件
-
-### 4. 安全闸门决策
-
-- 根据综合风险阈值输出闸门结论
-- 支持按恶意依赖、许可证风险等条件阻断
-- 输出 Pass、Warn、Block 三类结论
-- 显示触发策略和结论说明
-
-### 5. 插件扩展
-
-- 支持从 `plugins/` 目录加载 JSON 规则包
-- 支持在界面中启停插件
-- 支持重新加载插件规则
-- 可扩展新的名称、版本、来源和生态检测规则
-
-### 6. 报告导出与样例演示
-
-- 支持导出完整扫描报告
-- 支持导出 SBOM 文件
-- 内置示例项目，便于展示和验收
-
-## 支持的依赖清单
-
-当前版本支持以下清单或锁文件：
-
-| 生态 | 文件 |
+| Ecosystem | Files |
 | --- | --- |
-| npm | `package.json`、`package-lock.json`、`yarn.lock`、`pnpm-lock.yaml` |
+| npm | `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml` |
 | Python | `requirements*.txt` |
 | Go | `go.mod` |
 | Rust | `Cargo.toml` |
@@ -88,133 +27,131 @@ ShadowGuard 的目标是帮助用户在本地尽早发现依赖风险，减少�
 | Java | `pom.xml` |
 | .NET | `*.csproj` |
 
-说明：
+Generated or third-party directories such as `node_modules`, `bin`, `obj`, `.git`, virtual environments, and build output folders are skipped during scanning.
 
-- 扫描器会自动过滤 `node_modules`、`bin`、`obj`、`.git`、虚拟环境等第三方或生成目录，避免把外部内容误计入项目结果。
+## Requirements
 
-## 运行环境
+- Windows 10 or Windows 11
+- .NET 6 SDK for source builds
+- WPF-capable desktop environment
+- PowerShell for build scripts
 
-请在 Windows 环境下运行本项目。
+End users who install the self-contained release build do not need to install the .NET SDK separately.
 
-- 操作系统：Windows 10 或 Windows 11
-- SDK：.NET 6 SDK
-- 桌面环境：支持 WPF
-- 推荐终端：PowerShell
+## Installation
 
-## 安装与运行
+### Install from GitHub Actions artifact
 
-### 1. 准备项目
+The CI workflow builds a Windows installer named `ShadowGuard-Setup.exe`.
 
-确保当前工作目录为项目根目录：
+1. Open the repository's **Actions** tab.
+2. Select the latest successful `CI` run.
+3. Download the `ShadowGuard-Setup` artifact.
+4. Extract the artifact archive.
+5. Run `ShadowGuard-Setup.exe` and follow the installer wizard.
+6. Launch ShadowGuard from the Start menu or desktop shortcut.
+
+### Install from GitHub Releases
+
+When a version tag such as `v1.0.0` is pushed, the CI workflow creates a GitHub Release and attaches `ShadowGuard-Setup.exe` to the release assets.
+
+Download the installer from the repository's **Releases** page and run it on Windows.
+
+### Use the portable build
+
+The CI workflow also uploads `ShadowGuard-portable-win-x64`.
+
+1. Download the artifact from a successful CI run.
+2. Extract the archive.
+3. Run `ShadowGuard.exe` from the extracted folder.
+
+## Build from Source
+
+Clone the repository and build the solution:
 
 ```powershell
-cd d:\shadowguard
+git clone https://github.com/Fannar-afk/shadowguard.git
+cd shadowguard
+dotnet restore .\shadowguard.sln
+dotnet build .\shadowguard.sln --configuration Release
 ```
 
-### 2. 配置运行环境
-
-建议在 PowerShell 中设置以下环境变量：
-
-```powershell
-$env:DOTNET_CLI_HOME='d:\shadowguard\.dotnet'
-$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
-$env:LOCALAPPDATA='d:\shadowguard\.localappdata'
-$env:APPDATA='d:\shadowguard\.localappdata'
-```
-
-这些变量用于将缓存和本地数据限制在项目目录下，便于演示、打包和验收。
-
-### 3. 编译项目
-
-执行以下命令：
-
-```powershell
-dotnet build .\ShadowGuard\ShadowGuard.csproj
-```
-
-如果编译成功，会在 `ShadowGuard\bin\Debug\net6.0-windows\` 下生成可执行文件。
-
-### 4. 运行项目
-
-执行以下命令启动桌面程序：
+Run the desktop app from source:
 
 ```powershell
 dotnet run --project .\ShadowGuard\ShadowGuard.csproj
 ```
 
-### 5. 发布为可执行程序
-
-如果需要生成发布版单文件程序，可执行：
+Create a self-contained win-x64 portable build:
 
 ```powershell
-$env:DOTNET_CLI_HOME='d:\shadowguard\.dotnet'
-$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
-
-dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
+dotnet publish .\ShadowGuard\ShadowGuard.csproj `
+  -c Release `
+  -r win-x64 `
+  --self-contained true `
+  -p:PublishSingleFile=true `
+  -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:PublishTrimmed=false `
+  -o .\artifacts\publish
 ```
 
-发布产物默认位于：
+## Build the Windows Installer Locally
+
+ShadowGuard uses Inno Setup for the Windows installer. The installer script is located at:
 
 ```text
-ShadowGuard\bin\Release\net6.0-windows\win-x64\publish\
+package/ShadowGuard.iss
 ```
 
-## 使用方法
+Install Inno Setup 6, publish the app, and compile the installer:
 
-### 快速体验
+```powershell
+New-Item -ItemType Directory -Force -Path .\artifacts\installer | Out-Null
 
-1. 启动 ShadowGuard。
-2. 点击“加载示例”，加载 `samples/demo-workspace`。
-3. 点击“开始扫描”。
-4. 查看依赖风险、SBOM 和安全闸门结果。
-5. 如有需要，导出报告或 SBOM 文件。
+$env:SHADOWGUARD_VERSION='1.0.0'
+$env:SHADOWGUARD_PUBLISH_DIR=(Resolve-Path '.\artifacts\publish').Path
+$env:SHADOWGUARD_OUTPUT_DIR=(Resolve-Path '.\artifacts\installer').Path
 
-### 扫描自己的项目
+& 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' .\package\ShadowGuard.iss
+```
 
-1. 点击“选择目录”。
-2. 选择待扫描的项目根目录。
-3. 点击“开始扫描”。
-4. 等待扫描完成后查看结果。
+The generated installer will be written to:
 
-### 查看扫描结果
+```text
+artifacts\installer\ShadowGuard-Setup.exe
+```
 
-程序主界面分为三个主要区域：
+## Usage
 
-#### 依赖防火墙
+### Scan the sample workspace
 
-- 查看风险发现列表
-- 查看组件清单
-- 使用搜索框筛选风险或组件
-- 查看来源文件与处理建议
+1. Launch ShadowGuard.
+2. Click **加载示例** to load `samples/demo-workspace`.
+3. Click **开始扫描**.
+4. Review dependency findings, the component list, SBOM preview, and gate result.
+5. Export the scan report or SBOM JSON if needed.
 
-#### SBOM 与风险
+### Scan your own project
 
-- 查看综合风险分
-- 查看整体风险等级
-- 查看 SBOM 组件清单
-- 查看 SBOM JSON 预览
+1. Click **选择目录**.
+2. Choose the root directory of the project to scan.
+3. Click **开始扫描**.
+4. Review findings, source files, recommendations, and the final gate decision.
 
-#### 安全闸门与插件
+### Export results
 
-- 调整阻断阈值
-- 配置恶意依赖、许可证风险、来源风险策略
-- 查看最终闸门结论
-- 启停插件并重新加载插件
+ShadowGuard supports two export formats from the UI:
 
-### 导出结果
+- Full scan report JSON
+- SBOM JSON
 
-程序支持两类导出：
+Export files are written only when the user selects a save path.
 
-- 导出扫描报告
-- 导出 SBOM JSON
+## Plugin Rules
 
-导出文件由用户主动选择保存路径，程序不会自动写入被扫描项目目录。
+ShadowGuard loads plugin rule packs from the local `plugins/` directory. Plugin files are JSON documents and are loaded when the application starts or when the user clicks **重新加载插件**.
 
-## 插件机制
-
-插件采用 JSON 格式，放置在 `plugins/` 目录后会被自动发现并加载。
-
-### 当前支持的匹配方式
+Supported match types:
 
 - `ExactName`
 - `ContainsName`
@@ -223,96 +160,109 @@ ShadowGuard\bin\Release\net6.0-windows\win-x64\publish\
 - `VersionPattern`
 - `Ecosystem`
 
-### 规则字段说明
+Rule fields:
 
-| 字段 | 含义 |
+| Field | Description |
 | --- | --- |
-| `id` | 规则唯一标识 |
-| `name` | 规则名称 |
-| `matchType` | 匹配方式 |
-| `pattern` | 匹配模式 |
-| `severity` | 风险等级 |
-| `score` | 风险分 |
-| `category` | 风险分类 |
-| `message` | 风险说明 |
-| `recommendation` | 处置建议 |
+| `id` | Unique rule identifier |
+| `name` | Rule display name |
+| `matchType` | Matching strategy |
+| `pattern` | Match pattern |
+| `severity` | Risk severity |
+| `score` | Risk score |
+| `category` | Risk category |
+| `message` | Finding message |
+| `recommendation` | Suggested action |
 
-### 插件使用步骤
+Example rule file:
 
-1. 在 `plugins/` 目录中放入规则文件。
-2. 启动程序或点击“重新加载插件”。
-3. 在“安全闸门与插件”页查看插件状态。
-4. 勾选或取消勾选插件启用状态。
-5. 重新扫描项目以应用最新规则。
+```json
+{
+  "pluginId": "custom-risk-rules",
+  "displayName": "Custom Risk Rules",
+  "version": "1.0.0",
+  "author": "ShadowGuard",
+  "description": "Example local dependency rules.",
+  "enabled": true,
+  "rules": [
+    {
+      "id": "custom.block.package",
+      "name": "Blocked package name",
+      "matchType": "ExactName",
+      "pattern": "example-risky-package",
+      "severity": "High",
+      "score": 75,
+      "category": "Plugin",
+      "message": "This package is blocked by a local rule.",
+      "recommendation": "Replace it with an approved package."
+    }
+  ]
+}
+```
 
-## 项目结构
+## Project Structure
 
 ```text
 shadowguard/
-├─ ShadowGuard/                 WPF 桌面应用与核心业务代码
-├─ plugins/                     插件规则目录
-├─ samples/                     示例项目目录
-├─ tools/                       辅助脚本
-├─ README.md                    项目说明文档
-├─ TESTING.md                   构建与验证记录
-├─ REQUIREMENTS_CHECK.md        验收要求核对说明
-└─ shadowguard.sln              解决方案文件
+├─ ShadowGuard/                 WPF desktop application and core implementation
+├─ ShadowGuard.Tests/           Lightweight behavior verification project
+├─ package/                     Windows installer script
+├─ plugins/                     Local JSON plugin rules
+├─ samples/                     Example projects for scanning
+├─ tools/                       Utility scripts
+├─ .github/workflows/           CI workflow
+├─ README.md                    Project documentation
+├─ CHANGELOG.md                 Release notes
+├─ CONTRIBUTING.md              Contribution guide
+├─ SECURITY.md                  Security policy
+├─ THIRD_PARTY_NOTICES.md       Third-party dependency notes
+└─ shadowguard.sln              Visual Studio solution
 ```
 
-## 技术架构
+## Architecture
 
-核心代码职责如下：
+Key components:
 
-- `MainWindow.xaml`
-  负责界面布局、功能入口和结果展示。
-- `MainWindow.xaml.cs`
-  负责按钮事件、交互逻辑、扫描触发和导出操作。
-- `Services/ProjectScanner.cs`
-  负责解析多生态依赖清单并抽取组件信息。
-- `Services/RiskScoringService.cs`
-  负责生成风险发现、组件风险分和项目综合风险。
-- `Services/GateDecisionService.cs`
-  负责根据策略生成安全闸门结论。
-- `Services/PluginService.cs`
-  负责插件加载和管理。
-- `Models/ScanModels.cs`
-  负责统一数据模型。
-- `Utilities/`
-  提供本地化、哈希、工作区定位等公共能力。
+- `MainWindow.xaml` and `MainWindow.xaml.cs`: desktop UI, commands, result binding, and export actions.
+- `Services/ProjectScanner.cs`: manifest discovery and dependency extraction.
+- `Services/RiskScoringService.cs`: finding generation, scoring, and SBOM creation.
+- `Services/GateDecisionService.cs`: pass/warn/block decision logic.
+- `Services/PluginService.cs`: local JSON plugin loading.
+- `Models/ScanModels.cs`: scan result, finding, dependency, SBOM, policy, and plugin models.
+- `Utilities/`: localization, severity helpers, hashing, observable collections, and workspace path helpers.
 
-## 安全说明
+## Development
 
-当前版本具有以下安全边界：
+Run the lightweight verification project:
 
-- 仅进行离线本地扫描
-- 不执行远程脚本
-- 不主动修改被扫描项目源码
-- 不注入后门逻辑
-- 仅在用户主动导出时写出报告或 SBOM 文件
-- 仅在用户主动操作时打开插件目录
+```powershell
+dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release
+```
 
-说明：
-
-- 本项目是本地静态分析和策略判断工具，不是联网漏洞数据库同步工具。
-- 许可证风险识别和补充规则主要来自本地插件包。
-
-## 验证与文档
-
-项目内已提供相关说明文件：
-
-- `TESTING.md`
-  构建、启动和代码审查验证记录。
-- `REQUIREMENTS_CHECK.md`
-  对照验收要求的逐条说明。
-- `samples/README.md`
-  示例项目说明。
-- `tools/Count-CodeLines.ps1`
-  用于统计自研有效代码行数。
-
-执行代码量统计：
+Count effective source lines:
 
 ```powershell
 .\tools\Count-CodeLines.ps1
 ```
 
-截至 2026-03-19，脚本统计结果为 `TOTAL=2319`。
+Build everything through the solution:
+
+```powershell
+dotnet build .\shadowguard.sln --configuration Release
+```
+
+## Security Notes
+
+ShadowGuard is a local static analysis and policy evaluation tool.
+
+- It scans dependency manifest files.
+- It does not execute code from scanned projects.
+- It does not automatically modify scanned source files.
+- It writes reports and SBOM files only when the user exports them.
+- Plugin rules are local JSON rules loaded from `plugins/`.
+
+For vulnerability reporting, see `SECURITY.md`.
+
+## License
+
+ShadowGuard is licensed under the MIT License. See `LICENSE` for details.
