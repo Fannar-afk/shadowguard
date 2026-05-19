@@ -29,6 +29,9 @@ jobs:
       - name: Build
         run: dotnet build .\shadowguard.sln --configuration Release --no-restore
 
+      - name: Run lightweight verification
+        run: dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build
+
       - name: Count source lines
         shell: pwsh
         run: .\tools\Count-CodeLines.ps1
