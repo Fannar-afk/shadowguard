@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, for example v1.0.0'
+        required: true
+        default: 'v1.0.0'
+      prerelease:
+        description: 'Mark this release as a pre-release'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: windows-latest
+
+    steps:
+      - name: Validate version
+        shell: pwsh
+        run: |
+          if ('${{ inputs.version }}' -notmatch '^v\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?$') {
+            throw 'Version must look like v1.0.0 or v1.0.0-beta.1'
+          }
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Restore
+        run: dotnet restore .\shadowguard.sln
+
+      - name: Build
+        run: dotnet build .\shadowguard.sln --configuration Release --no-restore
+
+      - name: Run lightweight verification
+        run: dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build
+
+      - name: Publish win-x64
+        run: dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\artifacts\publish
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path .\artifacts\installer | Out-Null
+          $env:SHADOWGUARD_VERSION = '${{ inputs.version }}'.TrimStart('v')
+          $env:SHADOWGUARD_PUBLISH_DIR = (Resolve-Path .\artifacts\publish).Path
+          $env:SHADOWGUARD_OUTPUT_DIR = (Resolve-Path .\artifacts\installer).Path
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\package\ShadowGuard.iss
+
+      - name: Archive portable build
+        shell: pwsh
+        run: |
+          Compress-Archive -Path .\artifacts\publish\* -DestinationPath .\artifacts\ShadowGuard-portable-win-x64.zip -Force
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          name: ShadowGuard ${{ inputs.version }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            artifacts/installer/ShadowGuard-Setup.exe
+            artifacts/ShadowGuard-portable-win-x64.zip
