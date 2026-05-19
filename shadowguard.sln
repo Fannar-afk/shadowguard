@@ -4,6 +4,8 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShadowGuard", "ShadowGuard\ShadowGuard.csproj", "{A7D703E0-52E3-1824-3A8B-1937D8727730}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShadowGuard.Tests", "ShadowGuard.Tests\ShadowGuard.Tests.csproj", "{E1C7A2BB-9C02-4DD3-9BAF-9878F6B1C2E2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +16,10 @@ Global
 		{A7D703E0-52E3-1824-3A8B-1937D8727730}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A7D703E0-52E3-1824-3A8B-1937D8727730}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A7D703E0-52E3-1824-3A8B-1937D8727730}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1C7A2BB-9C02-4DD3-9BAF-9878F6B1C2E2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1C7A2BB-9C02-4DD3-9BAF-9878F6B1C2E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1C7A2BB-9C02-4DD3-9BAF-9878F6B1C2E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1C7A2BB-9C02-4DD3-9BAF-9878F6B1C2E2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - chore/acceptance-hardening
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build ShadowGuard
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      - name: Restore
+        run: dotnet restore .\shadowguard.sln
+
+      - name: Build
+        run: dotnet build .\shadowguard.sln --configuration Release --no-restore
+
+      - name: Run lightweight verification
+        run: dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build
+
+      - name: Count source lines
+        shell: pwsh
+        run: .\tools\Count-CodeLines.ps1
+
+      - name: Publish win-x64
+        run: dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
