@@ -103,15 +103,38 @@ ShadowGuard 的目标是帮助用户在本地尽早发现依赖风险，减少�
 
 ## 安装与运行
 
-### 1. 准备项目
+### 方式一：使用安装包
+
+项目 CI 会自动构建 Windows 安装包 `ShadowGuard-Setup.exe`。
+
+推荐普通用户使用安装包：
+
+1. 打开 GitHub 仓库的 `Actions` 页面。
+2. 选择最新一次通过的 `CI` 工作流。
+3. 在 `Artifacts` 区域下载 `ShadowGuard-Setup`。
+4. 解压 artifact，双击 `ShadowGuard-Setup.exe`。
+5. 根据安装向导完成安装。
+6. 从开始菜单或桌面快捷方式启动 ShadowGuard。
+
+如果仓库创建了 `v*` 形式的版本标签，例如 `v1.0.0`，CI 会自动创建 GitHub Release，并把 `ShadowGuard-Setup.exe` 附加到 Release Assets 中。普通用户可以直接从 Releases 页面下载安装包。
+
+### 方式二：使用便携版
+
+CI 也会生成便携版 artifact：`ShadowGuard-portable-win-x64`。
+
+使用方法：
+
+1. 打开 GitHub Actions 中最新通过的 CI 工作流。
+2. 下载 `ShadowGuard-portable-win-x64`。
+3. 解压后运行其中的 `ShadowGuard.exe`。
+
+### 方式三：源码编译运行
 
 确保当前工作目录为项目根目录：
 
 ```powershell
 cd d:\shadowguard
 ```
-
-### 2. 配置运行环境
 
 建议在 PowerShell 中设置以下环境变量：
 
@@ -124,27 +147,19 @@ $env:APPDATA='d:\shadowguard\.localappdata'
 
 这些变量用于将缓存和本地数据限制在项目目录下，便于演示、打包和验收。
 
-### 3. 编译项目
-
-执行以下命令：
+编译项目：
 
 ```powershell
 dotnet build .\ShadowGuard\ShadowGuard.csproj
 ```
 
-如果编译成功，会在 `ShadowGuard\bin\Debug\net6.0-windows\` 下生成可执行文件。
-
-### 4. 运行项目
-
-执行以下命令启动桌面程序：
+运行项目：
 
 ```powershell
 dotnet run --project .\ShadowGuard\ShadowGuard.csproj
 ```
 
-### 5. 发布为可执行程序
-
-如果需要生成发布版单文件程序，可执行：
+发布为 win-x64 便携程序：
 
 ```powershell
 $env:DOTNET_CLI_HOME='d:\shadowguard\.dotnet'
@@ -157,6 +172,33 @@ dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-con
 
 ```text
 ShadowGuard\bin\Release\net6.0-windows\win-x64\publish\
+```
+
+### 方式四：本地生成安装包
+
+本项目提供 Inno Setup 安装脚本：
+
+```text
+package/ShadowGuard.iss
+```
+
+本地生成安装包步骤：
+
+1. 安装 Inno Setup 6。
+2. 执行 `dotnet publish` 生成 win-x64 发布目录。
+3. 设置环境变量并调用 `ISCC.exe`：
+
+```powershell
+$env:SHADOWGUARD_VERSION='1.0.0'
+$env:SHADOWGUARD_PUBLISH_DIR=(Resolve-Path '.\ShadowGuard\bin\Release\net6.0-windows\win-x64\publish').Path
+$env:SHADOWGUARD_OUTPUT_DIR=(Resolve-Path '.\artifacts\installer').Path
+& 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' .\package\ShadowGuard.iss
+```
+
+生成的安装程序为：
+
+```text
+artifacts\installer\ShadowGuard-Setup.exe
 ```
 
 ## 使用方法
@@ -250,12 +292,16 @@ ShadowGuard\bin\Release\net6.0-windows\win-x64\publish\
 ```text
 shadowguard/
 ├─ ShadowGuard/                 WPF 桌面应用与核心业务代码
+├─ ShadowGuard.Tests/           轻量验证项目
+├─ package/                     Windows 安装包脚本
 ├─ plugins/                     插件规则目录
 ├─ samples/                     示例项目目录
 ├─ tools/                       辅助脚本
 ├─ README.md                    项目说明文档
 ├─ TESTING.md                   构建与验证记录
 ├─ REQUIREMENTS_CHECK.md        验收要求核对说明
+├─ SECURITY.md                  安全政策说明
+├─ THIRD_PARTY_NOTICES.md       第三方依赖与许可证说明
 └─ shadowguard.sln              解决方案文件
 ```
 
@@ -304,6 +350,12 @@ shadowguard/
   构建、启动和代码审查验证记录。
 - `REQUIREMENTS_CHECK.md`
   对照验收要求的逐条说明。
+- `SECURITY.md`
+  安全政策与漏洞反馈说明。
+- `THIRD_PARTY_NOTICES.md`
+  第三方依赖和许可证说明。
+- `case-studies/demo-workspace-scan.md`
+  多生态示例工作区应用案例。
 - `samples/README.md`
   示例项目说明。
 - `tools/Count-CodeLines.ps1`
