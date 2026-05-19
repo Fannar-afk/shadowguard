@@ -13,6 +13,9 @@
   <ItemGroup>
     <Resource Include="Assets\shadowguard.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\samples\**\*.*" Link="samples\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\plugins\**\*.json" Link="plugins\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
-
 
