@@ -1,0 +1,54 @@
+{
+  "pluginId": "default-risk-rules",
+  "displayName": "Default Risk Rules",
+  "version": "1.0.0",
+  "author": "ShadowGuard",
+  "description": "Built-in local rules for common supply-chain risk signals.",
+  "enabled": true,
+  "rules": [
+    {
+      "id": "default.source.git",
+      "name": "Git source dependency",
+      "matchType": "SourceType",
+      "pattern": "Git",
+      "severity": "Medium",
+      "score": 45,
+      "category": "Source",
+      "message": "Dependency is resolved from a Git repository instead of a package registry.",
+      "recommendation": "Prefer a pinned registry package or review the repository and commit reference before release."
+    },
+    {
+      "id": "default.source.url",
+      "name": "URL source dependency",
+      "matchType": "SourceType",
+      "pattern": "Url",
+      "severity": "Medium",
+      "score": 45,
+      "category": "Source",
+      "message": "Dependency is resolved from a direct URL.",
+      "recommendation": "Use a trusted package registry or verify the downloaded artifact and its checksum."
+    },
+    {
+      "id": "default.source.local",
+      "name": "Local path dependency",
+      "matchType": "SourceType",
+      "pattern": "Local",
+      "severity": "Low",
+      "score": 25,
+      "category": "Source",
+      "message": "Dependency is resolved from a local path.",
+      "recommendation": "Confirm the local dependency is intentional and included in the release process."
+    },
+    {
+      "id": "default.version.prerelease",
+      "name": "Pre-release version",
+      "matchType": "VersionPattern",
+      "pattern": "(?i)(alpha|beta|rc|snapshot|preview|next|canary)",
+      "severity": "Medium",
+      "score": 40,
+      "category": "Stability",
+      "message": "Dependency version appears to be a pre-release build.",
+      "recommendation": "Prefer a stable release version for production builds."
+    }
+  ]
+}
