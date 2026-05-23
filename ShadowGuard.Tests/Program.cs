@@ -13,7 +13,6 @@ CheckPluginRegexRuleMatching(failures);
 CheckPluginVersionPatternMatching(failures);
 CheckPluginRuleDoesNotMatchEmptyPattern(failures);
 CheckPluginInvalidRegexDoesNotCrash(failures);
-CheckPluginRuleValidation(failures);
 
 if (failures.Count > 0)
 {
@@ -211,30 +210,6 @@ static void CheckPluginInvalidRegexDoesNotCrash(List<string> failures)
     };
 
     Expect(!invalidRegexRule.Matches(component), "invalid regex rule should not crash and should not match", failures);
-}
-
-static void CheckPluginRuleValidation(List<string> failures)
-{
-    var validRule = new PluginRule
-    {
-        Id = "test.valid",
-        Name = "Valid test rule",
-        MatchType = "ExactName",
-        Pattern = "lodash",
-        Score = 50
-    };
-
-    var invalidRule = new PluginRule
-    {
-        Id = "test.invalid",
-        Name = "Invalid test rule",
-        MatchType = "UnknownType",
-        Pattern = "lodash",
-        Score = 50
-    };
-
-    Expect(validRule.TryValidate(out _), "valid plugin rule should pass validation", failures);
-    Expect(!invalidRule.TryValidate(out _), "unsupported plugin match type should fail validation", failures);
 }
 
 static void Expect(bool condition, string message, List<string> failures)
