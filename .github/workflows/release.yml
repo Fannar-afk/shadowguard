@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version, for example v1.0.0'
+        description: 'Release version, for example v1.0.12'
         required: true
-        default: 'v1.0.0'
+        default: 'v1.0.12'
       prerelease:
         description: 'Mark this release as a pre-release'
         required: true
@@ -16,14 +16,29 @@ on:
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: pwsh
+
+concurrency:
+  group: shadowguard-release
+  cancel-in-progress: true
+
 jobs:
   release:
     name: Build and publish release
-    runs-on: windows-latest
+    runs-on: windows-2022
+    timeout-minutes: 60
 
     steps:
+      - name: Show runner information
+        run: |
+          Write-Host "Runner OS: $env:RUNNER_OS"
+          Write-Host "Runner name: $env:RUNNER_NAME"
+          Write-Host "Machine: $env:COMPUTERNAME"
+          pwsh --version
+
       - name: Validate version
-        shell: pwsh
         run: |
           if ('${{ inputs.version }}' -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$') {
             throw 'Version must look like v1.0.0 or v1.0.0-beta.1'
@@ -46,7 +61,7 @@ jobs:
       - name: Run xUnit tests
         run: dotnet test .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build --logger trx --results-directory .\artifacts\test-results
 
-      - name: Run CLI smoke test
+      - name: Run CLI smoke test from source
         run: dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Release --no-build -- --path .\samples\demo-npm-risk --plugins .\plugins --validate-sbom --fail-on-invalid-sbom --out .\artifacts\cli-report.json
 
       - name: Publish desktop win-x64
@@ -55,16 +70,18 @@ jobs:
       - name: Publish CLI win-x64
         run: dotnet publish .\ShadowGuard.Cli\ShadowGuard.Cli.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\artifacts\publish
 
+      - name: Verify packaged CLI
+        run: |
+          .\artifacts\publish\shadowguard-cli.exe --help
+          .\artifacts\publish\shadowguard-cli.exe --path .\artifacts\publish\samples\demo-npm-risk --plugins .\artifacts\publish\plugins --validate-sbom --fail-on-invalid-sbom --out .\artifacts\published-cli-report.json
+
       - name: Verify release payload
-        shell: pwsh
         run: .\tools\Verify-ReleasePayload.ps1 -PublishDir .\artifacts\publish
 
       - name: Install Inno Setup
-        shell: pwsh
         run: choco install innosetup --yes --no-progress
 
       - name: Build Windows installer
-        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path .\artifacts\installer | Out-Null
           $env:SHADOWGUARD_VERSION = '${{ inputs.version }}'.TrimStart('v')
@@ -73,12 +90,9 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\package\ShadowGuard.iss
 
       - name: Archive portable build
-        shell: pwsh
-        run: |
-          Compress-Archive -Path .\artifacts\publish\* -DestinationPath .\artifacts\ShadowGuard-portable-win-x64.zip -Force
+        run: Compress-Archive -Path .\artifacts\publish\* -DestinationPath .\artifacts\ShadowGuard-portable-win-x64.zip -Force
 
       - name: Generate SHA256 checksums
-        shell: pwsh
         run: |
           $files = @(
             '.\artifacts\installer\ShadowGuard-Setup.exe',
@@ -98,6 +112,15 @@ jobs:
           name: ShadowGuard-release-test-results
           path: .\artifacts\test-results\*.trx
 
+      - name: Upload release assets as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShadowGuard-release-assets
+          path: |
+            artifacts/installer/ShadowGuard-Setup.exe
+            artifacts/ShadowGuard-portable-win-x64.zip
+            artifacts/SHA256SUMS.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -105,6 +128,7 @@ jobs:
           name: ShadowGuard ${{ inputs.version }}
           prerelease: ${{ inputs.prerelease }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             artifacts/installer/ShadowGuard-Setup.exe
             artifacts/ShadowGuard-portable-win-x64.zip
