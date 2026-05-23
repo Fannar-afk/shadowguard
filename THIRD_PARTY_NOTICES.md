@@ -2,9 +2,22 @@
 
 This document records third-party dependencies and license considerations for ShadowGuard.
 
-## Current Dependency Status
+## Runtime Dependency Status
 
-At the time this notice was added, `ShadowGuard/ShadowGuard.csproj` does not declare third-party NuGet `PackageReference` dependencies. The project primarily uses the .NET SDK, WPF, Windows Forms, and .NET runtime libraries.
+`ShadowGuard` and `ShadowGuard.Core` primarily use the .NET SDK, WPF, Windows Forms, and .NET runtime libraries. The desktop application and core library do not currently declare additional third-party runtime NuGet package dependencies.
+
+## Development and Test Dependencies
+
+`ShadowGuard.Tests` uses the following NuGet packages for automated testing and test coverage support:
+
+| Package | Version | Purpose | Scope |
+| --- | --- | --- | --- |
+| `Microsoft.NET.Test.Sdk` | `17.11.1` | .NET test execution infrastructure | Development/test only |
+| `xunit` | `2.9.2` | Unit testing framework | Development/test only |
+| `xunit.runner.visualstudio` | `2.8.2` | Visual Studio and `dotnet test` runner integration | Development/test only |
+| `coverlet.collector` | `6.0.2` | Code coverage data collection | Development/test only |
+
+These packages are used by the test project and are not bundled as application runtime plugins or rule packs.
 
 ## Platform Dependencies
 
@@ -33,4 +46,4 @@ When adding a third-party package, library, code snippet, binary, dataset, or as
 
 ## License Compatibility Note
 
-The repository now includes an MIT License for ShadowGuard's own source code. Future contributors should verify that any added third-party dependency is compatible with MIT-licensed redistribution and with the intended packaging model.
+The repository includes an MIT License for ShadowGuard's own source code. Future contributors should verify that any added third-party dependency is compatible with MIT-licensed redistribution and with the intended packaging model.
