@@ -43,8 +43,11 @@ jobs:
       - name: Build
         run: dotnet build .\shadowguard.sln --configuration Release --no-restore
 
-      - name: Run lightweight verification
-        run: dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build
+      - name: Run xUnit tests
+        run: dotnet test .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build --logger trx --results-directory .\artifacts\test-results
+
+      - name: Run CLI smoke test
+        run: dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Release --no-build -- --path .\samples\demo-npm-risk --plugins .\plugins --out .\artifacts\cli-report.json
 
       - name: Publish win-x64
         run: dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\artifacts\publish
@@ -70,6 +73,13 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path .\artifacts\publish\* -DestinationPath .\artifacts\ShadowGuard-portable-win-x64.zip -Force
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShadowGuard-release-test-results
+          path: .\artifacts\test-results\*.trx
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
