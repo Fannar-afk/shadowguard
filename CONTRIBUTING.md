@@ -17,10 +17,18 @@ dotnet restore .\shadowguard.sln
 dotnet build .\shadowguard.sln --configuration Release
 ```
 
-## Lightweight Verification
+## Tests
+
+ShadowGuard uses xUnit for automated tests.
 
 ```powershell
-dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release
+dotnet test .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release
+```
+
+## CLI Smoke Test
+
+```powershell
+dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Release -- --path .\samples\demo-npm-risk --plugins .\plugins --out .\artifacts\cli-report.json
 ```
 
 ## Source Line Count
@@ -34,8 +42,9 @@ dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuratio
 Before opening a pull request, please check:
 
 - The project builds successfully.
-- Lightweight verification passes.
-- New scanner or rule behavior has at least one verification case.
+- xUnit tests pass.
+- CLI smoke test passes when CLI or core behavior changes.
+- New scanner or rule behavior has at least one test case.
 - Documentation is updated if behavior or user workflow changes.
 - New third-party dependencies are recorded in `THIRD_PARTY_NOTICES.md`.
 - Security-sensitive changes are described clearly in the PR body.
