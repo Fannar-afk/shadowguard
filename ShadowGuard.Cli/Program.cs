@@ -203,7 +203,7 @@ static void PrintHelp()
     Console.WriteLine("ShadowGuard CLI");
     Console.WriteLine();
     Console.WriteLine("Usage:");
-    Console.WriteLine("  shadowguard --path <project-dir> [--plugins <plugin-dir>] [--out <file>] [--format report|sbom|validation|vuln]");
+    Console.WriteLine("  shadowguard-cli --path <project-dir> [--plugins <plugin-dir>] [--out <file>] [--format report|sbom|validation|vuln]");
     Console.WriteLine();
     Console.WriteLine("Options:");
     Console.WriteLine("  -p, --path <dir>             Project directory to scan.");
