@@ -5,8 +5,13 @@ var failures = new List<string>();
 CheckSeverityMapping(failures);
 CheckGateDecisionPass(failures);
 CheckGateDecisionBlockOnScore(failures);
+CheckGateDecisionBlockOnMalicious(failures);
+CheckGateDecisionBlockOnLicenseRisk(failures);
 CheckGateDecisionWarnOnSource(failures);
 CheckPluginRuleMatching(failures);
+CheckPluginRegexRuleMatching(failures);
+CheckPluginVersionPatternMatching(failures);
+CheckPluginRuleDoesNotMatchEmptyPattern(failures);
 
 if (failures.Count > 0)
 {
@@ -54,6 +59,48 @@ static void CheckGateDecisionBlockOnScore(List<string> failures)
     Expect(decision.Outcome == GateOutcome.Block, "score above threshold should block", failures);
 }
 
+static void CheckGateDecisionBlockOnMalicious(List<string> failures)
+{
+    var result = new ScanResult
+    {
+        Summary = new ScanSummary { OverallScore = 20 },
+        Findings = new List<Finding>
+        {
+            new()
+            {
+                Category = "Malicious",
+                Severity = SeverityLevel.High,
+                Score = 80,
+                RuleName = "Historical incident package"
+            }
+        }
+    };
+
+    var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { BlockOnMalicious = true });
+    Expect(decision.Outcome == GateOutcome.Block, "high malicious finding should block when policy is enabled", failures);
+}
+
+static void CheckGateDecisionBlockOnLicenseRisk(List<string> failures)
+{
+    var result = new ScanResult
+    {
+        Summary = new ScanSummary { OverallScore = 20 },
+        Findings = new List<Finding>
+        {
+            new()
+            {
+                Category = "License",
+                Severity = SeverityLevel.Medium,
+                Score = 55,
+                RuleName = "License risk"
+            }
+        }
+    };
+
+    var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { BlockOnLicenseRisk = true });
+    Expect(decision.Outcome == GateOutcome.Block, "medium license finding should block when policy is enabled", failures);
+}
+
 static void CheckGateDecisionWarnOnSource(List<string> failures)
 {
     var result = new ScanResult
@@ -86,6 +133,63 @@ static void CheckPluginRuleMatching(List<string> failures)
     Expect(exact.Matches(component), "ExactName rule should match component name", failures);
     Expect(contains.Matches(component), "ContainsName rule should match component name", failures);
     Expect(ecosystem.Matches(component), "Ecosystem rule should match component ecosystem", failures);
+}
+
+static void CheckPluginRegexRuleMatching(List<string> failures)
+{
+    var component = new DependencyComponent
+    {
+        Name = "shadowguard-demo-package",
+        Version = "1.0.0",
+        SourceType = "Registry",
+        Ecosystem = "npm"
+    };
+
+    var regex = new PluginRule
+    {
+        MatchType = "RegexName",
+        Pattern = "^shadowguard-.*-package$"
+    };
+
+    Expect(regex.Matches(component), "RegexName rule should match package name", failures);
+}
+
+static void CheckPluginVersionPatternMatching(List<string> failures)
+{
+    var component = new DependencyComponent
+    {
+        Name = "typescript",
+        Version = "5.0.0-rc.1",
+        SourceType = "Registry",
+        Ecosystem = "npm"
+    };
+
+    var versionPattern = new PluginRule
+    {
+        MatchType = "VersionPattern",
+        Pattern = "(?i)(alpha|beta|rc|preview)"
+    };
+
+    Expect(versionPattern.Matches(component), "VersionPattern rule should match pre-release version", failures);
+}
+
+static void CheckPluginRuleDoesNotMatchEmptyPattern(List<string> failures)
+{
+    var component = new DependencyComponent
+    {
+        Name = "lodash",
+        Version = "4.17.21",
+        SourceType = "Registry",
+        Ecosystem = "npm"
+    };
+
+    var emptyPatternRule = new PluginRule
+    {
+        MatchType = "ContainsName",
+        Pattern = ""
+    };
+
+    Expect(!emptyPatternRule.Matches(component), "plugin rule with empty pattern should not match", failures);
 }
 
 static void Expect(bool condition, string message, List<string> failures)
