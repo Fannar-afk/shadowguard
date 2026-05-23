@@ -74,6 +74,20 @@ jobs:
         run: |
           Compress-Archive -Path .\artifacts\publish\* -DestinationPath .\artifacts\ShadowGuard-portable-win-x64.zip -Force
 
+      - name: Generate SHA256 checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            '.\artifacts\installer\ShadowGuard-Setup.exe',
+            '.\artifacts\ShadowGuard-portable-win-x64.zip'
+          )
+          $lines = foreach ($file in $files) {
+            $hash = Get-FileHash -Algorithm SHA256 -Path $file
+            "$($hash.Hash.ToLowerInvariant())  $(Split-Path -Leaf $file)"
+          }
+          $lines | Set-Content -Encoding ascii .\artifacts\SHA256SUMS.txt
+          Get-Content .\artifacts\SHA256SUMS.txt
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -91,3 +105,4 @@ jobs:
           files: |
             artifacts/installer/ShadowGuard-Setup.exe
             artifacts/ShadowGuard-portable-win-x64.zip
+            artifacts/SHA256SUMS.txt
