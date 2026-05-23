@@ -4,6 +4,7 @@ param(
 
 $requiredPaths = @(
     'ShadowGuard.exe',
+    'shadowguard-cli.exe',
     'samples',
     'plugins',
     'docs\README.md',
