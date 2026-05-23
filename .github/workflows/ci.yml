@@ -34,12 +34,19 @@ jobs:
       - name: Run lightweight verification
         run: dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build
 
+      - name: Run CLI smoke test
+        run: dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Release --no-build -- --path .\samples\demo-npm-risk --plugins .\plugins --out .\artifacts\cli-report.json
+
       - name: Count source lines
         shell: pwsh
         run: .\tools\Count-CodeLines.ps1
 
       - name: Publish win-x64
         run: dotnet publish .\ShadowGuard\ShadowGuard.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o .\artifacts\publish
+
+      - name: Verify release payload
+        shell: pwsh
+        run: .\tools\Verify-ReleasePayload.ps1 -PublishDir .\artifacts\publish
 
       - name: Install Inno Setup
         shell: pwsh
