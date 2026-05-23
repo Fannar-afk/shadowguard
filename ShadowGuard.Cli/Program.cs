@@ -20,7 +20,28 @@ try
     };
 
     var result = new ShadowGuardEngine().Scan(options.TargetPath, policy, options.PluginDirectory);
-    object payload = options.Format.Equals("sbom", StringComparison.OrdinalIgnoreCase) ? result.Sbom : result;
+    SbomValidationResult? sbomValidation = null;
+    VulnerabilityScanResult? vulnerabilityScan = null;
+
+    if (options.ValidateSbom)
+    {
+        sbomValidation = new CycloneDxValidator().Validate(result.Sbom);
+        Console.Error.WriteLine(sbomValidation.IsValid
+            ? "CycloneDX SBOM validation passed."
+            : $"CycloneDX SBOM validation failed. Errors={sbomValidation.Errors.Count}; Warnings={sbomValidation.Warnings.Count}");
+    }
+
+    if (options.EnableVulnerabilityLookup)
+    {
+        IVulnerabilityProvider provider = options.VulnerabilityProvider.Equals("osv", StringComparison.OrdinalIgnoreCase)
+            ? new OsvVulnerabilityProvider()
+            : throw new ArgumentException("Unsupported vulnerability provider: " + options.VulnerabilityProvider);
+
+        vulnerabilityScan = await provider.QueryAsync(result.Components);
+        Console.Error.WriteLine($"Vulnerability lookup completed. Provider={vulnerabilityScan.Provider}; Vulnerabilities={vulnerabilityScan.Vulnerabilities.Count}; Errors={vulnerabilityScan.Errors.Count}");
+    }
+
+    object payload = BuildPayload(options, result, sbomValidation, vulnerabilityScan);
     var jsonOptions = new JsonSerializerOptions
     {
         WriteIndented = true,
@@ -44,6 +65,16 @@ try
 
     Console.Error.WriteLine($"ShadowGuard scan completed. Components={result.Summary.TotalDependencies}; Findings={result.Summary.FindingsCount}; Gate={result.GateDecision.Outcome}");
 
+    if (options.FailOnInvalidSbom && sbomValidation is { IsValid: false })
+    {
+        return 4;
+    }
+
+    if (options.FailOnVulnerability && vulnerabilityScan is not null && vulnerabilityScan.Vulnerabilities.Count > 0)
+    {
+        return 5;
+    }
+
     if (options.FailOnBlock && result.GateDecision.Outcome == GateOutcome.Block)
     {
         return 2;
@@ -60,6 +91,23 @@ catch (Exception exception)
 {
     Console.Error.WriteLine("ShadowGuard scan failed: " + exception.Message);
     return 1;
+}
+
+static object BuildPayload(CliOptions options, ScanResult result, SbomValidationResult? sbomValidation, VulnerabilityScanResult? vulnerabilityScan)
+{
+    var format = options.Format.ToLowerInvariant();
+    return format switch
+    {
+        "sbom" => result.Sbom,
+        "validation" => sbomValidation ?? new CycloneDxValidator().Validate(result.Sbom),
+        "vuln" or "vulnerabilities" => vulnerabilityScan ?? new VulnerabilityScanResult { Provider = options.VulnerabilityProvider },
+        _ => new ScanCliReport
+        {
+            Scan = result,
+            SbomValidation = sbomValidation,
+            VulnerabilityScan = vulnerabilityScan
+        }
+    };
 }
 
 static CliOptions ParseArgs(string[] args)
@@ -87,6 +135,24 @@ static CliOptions ParseArgs(string[] args)
                 break;
             case "--format":
                 options.Format = ReadValue(args, ref index, arg);
+                break;
+            case "--validate-sbom":
+                options.ValidateSbom = true;
+                break;
+            case "--fail-on-invalid-sbom":
+                options.ValidateSbom = true;
+                options.FailOnInvalidSbom = true;
+                break;
+            case "--vuln":
+            case "--vulnerability":
+                options.EnableVulnerabilityLookup = true;
+                break;
+            case "--vuln-provider":
+                options.VulnerabilityProvider = ReadValue(args, ref index, arg);
+                break;
+            case "--fail-on-vulnerability":
+                options.EnableVulnerabilityLookup = true;
+                options.FailOnVulnerability = true;
                 break;
             case "--block-threshold":
                 if (int.TryParse(ReadValue(args, ref index, arg), out var threshold))
@@ -137,19 +203,24 @@ static void PrintHelp()
     Console.WriteLine("ShadowGuard CLI");
     Console.WriteLine();
     Console.WriteLine("Usage:");
-    Console.WriteLine("  shadowguard --path <project-dir> [--plugins <plugin-dir>] [--out <file>] [--format report|sbom]");
+    Console.WriteLine("  shadowguard --path <project-dir> [--plugins <plugin-dir>] [--out <file>] [--format report|sbom|validation|vuln]");
     Console.WriteLine();
     Console.WriteLine("Options:");
-    Console.WriteLine("  -p, --path <dir>          Project directory to scan.");
-    Console.WriteLine("      --plugins <dir>      Optional plugin rule directory.");
-    Console.WriteLine("  -o, --out <file>         Write JSON output to a file. Defaults to stdout.");
-    Console.WriteLine("      --format <format>    Output format: report or sbom. Default: report.");
-    Console.WriteLine("      --block-threshold N  Risk score threshold for Block. Default: 70.");
-    Console.WriteLine("      --fail-on-block      Return non-zero exit code when the gate is Block.");
-    Console.WriteLine("      --fail-on-warn       Return non-zero exit code when the gate is Warn or Block.");
-    Console.WriteLine("      --no-block-malicious Disable blocking on malicious or historical high-risk package findings.");
-    Console.WriteLine("      --no-block-license   Disable blocking on license risk findings.");
-    Console.WriteLine("      --no-warn-source     Disable warning on Git, URL, or local source findings.");
+    Console.WriteLine("  -p, --path <dir>             Project directory to scan.");
+    Console.WriteLine("      --plugins <dir>         Optional plugin rule directory.");
+    Console.WriteLine("  -o, --out <file>            Write JSON output to a file. Defaults to stdout.");
+    Console.WriteLine("      --format <format>       Output format: report, sbom, validation, or vuln. Default: report.");
+    Console.WriteLine("      --validate-sbom         Validate generated CycloneDX SBOM structure and required fields.");
+    Console.WriteLine("      --fail-on-invalid-sbom  Return non-zero exit code when SBOM validation fails.");
+    Console.WriteLine("      --vuln                  Query vulnerability data. Currently supports OSV.");
+    Console.WriteLine("      --vuln-provider <name>  Vulnerability provider. Default: osv.");
+    Console.WriteLine("      --fail-on-vulnerability Return non-zero exit code when vulnerabilities are found.");
+    Console.WriteLine("      --block-threshold N     Risk score threshold for Block. Default: 70.");
+    Console.WriteLine("      --fail-on-block         Return non-zero exit code when the gate is Block.");
+    Console.WriteLine("      --fail-on-warn          Return non-zero exit code when the gate is Warn or Block.");
+    Console.WriteLine("      --no-block-malicious    Disable blocking on malicious or historical high-risk package findings.");
+    Console.WriteLine("      --no-block-license      Disable blocking on license risk findings.");
+    Console.WriteLine("      --no-warn-source        Disable warning on Git, URL, or local source findings.");
 }
 
 sealed class CliOptions
@@ -164,5 +235,17 @@ sealed class CliOptions
     public bool WarnOnUnknownSource { get; set; } = true;
     public bool FailOnBlock { get; set; }
     public bool FailOnWarn { get; set; }
+    public bool ValidateSbom { get; set; }
+    public bool FailOnInvalidSbom { get; set; }
+    public bool EnableVulnerabilityLookup { get; set; }
+    public string VulnerabilityProvider { get; set; } = "osv";
+    public bool FailOnVulnerability { get; set; }
     public bool ShowHelp { get; set; }
+}
+
+sealed class ScanCliReport
+{
+    public ScanResult Scan { get; set; } = new();
+    public SbomValidationResult? SbomValidation { get; set; }
+    public VulnerabilityScanResult? VulnerabilityScan { get; set; }
 }
