@@ -31,8 +31,8 @@ jobs:
       - name: Build
         run: dotnet build .\shadowguard.sln --configuration Release --no-restore
 
-      - name: Run lightweight verification
-        run: dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build
+      - name: Run xUnit tests
+        run: dotnet test .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build --logger trx --results-directory .\artifacts\test-results
 
       - name: Run CLI smoke test
         run: dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Release --no-build -- --path .\samples\demo-npm-risk --plugins .\plugins --out .\artifacts\cli-report.json
@@ -60,6 +60,13 @@ jobs:
           $env:SHADOWGUARD_PUBLISH_DIR = (Resolve-Path .\artifacts\publish).Path
           $env:SHADOWGUARD_OUTPUT_DIR = (Resolve-Path .\artifacts\installer).Path
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\package\ShadowGuard.iss
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShadowGuard-test-results
+          path: .\artifacts\test-results\*.trx
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
