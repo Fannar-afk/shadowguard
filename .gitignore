@@ -4,6 +4,11 @@ obj/
 .dotnet/
 .localappdata/
 .nuget/
+artifacts/
+TestResults/
+*.trx
 *.user
 *.suo
 *.cache
+*.nupkg
+*.snupkg
