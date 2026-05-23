@@ -20,7 +20,7 @@ try
     };
 
     var result = new ShadowGuardEngine().Scan(options.TargetPath, policy, options.PluginDirectory);
-    var payload = options.Format.Equals("sbom", StringComparison.OrdinalIgnoreCase) ? result.Sbom : result;
+    object payload = options.Format.Equals("sbom", StringComparison.OrdinalIgnoreCase) ? result.Sbom : result;
     var jsonOptions = new JsonSerializerOptions
     {
         WriteIndented = true,
