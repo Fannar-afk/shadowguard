@@ -16,7 +16,7 @@ ShadowGuard 专注于本地静态分析：不会执行被扫描项目中的代�
 - **漏洞数据源接入**：CLI 支持可选接入 OSV 查询漏洞；返回结果中的 `CVE-*` 与 `GHSA-*` aliases 可用于关联 CVE 与 GitHub Security Advisory 编号。
 - **插件规则扩展**：支持从本地 `plugins/` 目录加载 JSON 规则包，扩展名称、版本、来源和生态匹配规则。
 - **报告导出**：支持从桌面端或 CLI 导出完整扫描报告、SBOM、SBOM 校验结果和漏洞查询结果。
-- **安装包与便携版构建**：通过 GitHub Actions 自动生成 Windows 安装包和 win-x64 便携版产物。
+- **安装包与便携版构建**：通过 GitHub Actions 自动生成 Windows 安装包、win-x64 便携版产物和 SHA256 校验文件。
 
 ## 支持的依赖清单
 
@@ -46,9 +46,19 @@ ShadowGuard 专注于本地静态分析：不会执行被扫描项目中的代�
 ```text
 ShadowGuard-Setup.exe
 ShadowGuard-portable-win-x64.zip
+SHA256SUMS.txt
 ```
 
 安装版双击 `ShadowGuard-Setup.exe` 后按向导安装；便携版解压后运行 `ShadowGuard.exe`。
+
+可以使用 PowerShell 校验下载文件完整性：
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\ShadowGuard-Setup.exe
+Get-Content .\SHA256SUMS.txt
+```
+
+确认输出的 SHA256 值与 `SHA256SUMS.txt` 中对应文件名的记录一致。
 
 ### 从 GitHub Actions 下载构建产物
 
@@ -283,7 +293,7 @@ dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Re
 .\tools\Count-CodeLines.ps1
 ```
 
-CI 工作流会自动执行恢复依赖、构建、xUnit 测试、CLI smoke test、SBOM 校验、源码行数统计、发布产物完整性检查、便携版发布和安装包构建。
+CI 工作流会自动执行恢复依赖、构建、xUnit 测试、CLI smoke test、SBOM 校验、源码行数统计、发布产物完整性检查、便携版发布和安装包构建。Release 工作流还会生成 `SHA256SUMS.txt`，用于校验安装包和便携版文件完整性。
 
 ## 安全说明
 
