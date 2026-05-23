@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -58,8 +58,28 @@ public sealed class Finding
     public string CategoryText => LocalizationHelper.ToChineseCategory(Category);
 }
 
+public sealed class ScanDiagnostic
+{
+    public string FilePath { get; set; } = string.Empty;
+    public string Source { get; set; } = string.Empty;
+    public string Level { get; set; } = "Info";
+    public string Message { get; set; } = string.Empty;
+}
+
 public sealed class PluginRule
 {
+    private static readonly HashSet<string> SupportedMatchTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ExactName",
+        "ContainsName",
+        "RegexName",
+        "SourceType",
+        "VersionPattern",
+        "Ecosystem"
+    };
+
+    private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(200);
+
     private string? _normalizedMatchType;
     private Regex? _cachedRegex;
     private string? _cachedRegexPattern;
@@ -87,16 +107,77 @@ public sealed class PluginRule
             return false;
         }
 
-        return NormalizedMatchType switch
+        try
         {
-            "exactname" => string.Equals(component.Name, Pattern, StringComparison.OrdinalIgnoreCase),
-            "containsname" => component.Name.Contains(Pattern, StringComparison.OrdinalIgnoreCase),
-            "regexname" => GetOrCreateRegex().IsMatch(component.Name),
-            "sourcetype" => string.Equals(component.SourceType, Pattern, StringComparison.OrdinalIgnoreCase),
-            "versionpattern" => GetOrCreateRegex().IsMatch(component.Version),
-            "ecosystem" => string.Equals(component.Ecosystem, Pattern, StringComparison.OrdinalIgnoreCase),
-            _ => false
-        };
+            return NormalizedMatchType switch
+            {
+                "exactname" => string.Equals(component.Name, Pattern, StringComparison.OrdinalIgnoreCase),
+                "containsname" => component.Name.Contains(Pattern, StringComparison.OrdinalIgnoreCase),
+                "regexname" => GetOrCreateRegex().IsMatch(component.Name),
+                "sourcetype" => string.Equals(component.SourceType, Pattern, StringComparison.OrdinalIgnoreCase),
+                "versionpattern" => GetOrCreateRegex().IsMatch(component.Version),
+                "ecosystem" => string.Equals(component.Ecosystem, Pattern, StringComparison.OrdinalIgnoreCase),
+                _ => false
+            };
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public bool TryValidate(out string error)
+    {
+        error = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            error = "规则 id 不能为空。";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            error = $"规则 {Id} 的 name 不能为空。";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(MatchType) || !SupportedMatchTypes.Contains(MatchType))
+        {
+            error = $"规则 {Id} 使用了不支持的 matchType：{MatchType}。";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(Pattern))
+        {
+            error = $"规则 {Id} 的 pattern 不能为空。";
+            return false;
+        }
+
+        if (Score < 0 || Score > 100)
+        {
+            error = $"规则 {Id} 的 score 必须在 0 到 100 之间。";
+            return false;
+        }
+
+        if (UsesRegex)
+        {
+            try
+            {
+                _ = GetOrCreateRegex();
+            }
+            catch (ArgumentException exception)
+            {
+                error = $"规则 {Id} 的正则表达式无效：{exception.Message}";
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private Regex GetOrCreateRegex()
@@ -107,7 +188,7 @@ public sealed class PluginRule
         }
 
         _cachedRegexPattern = Pattern;
-        _cachedRegex = new Regex(Pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        _cachedRegex = new Regex(Pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled, RegexMatchTimeout);
         return _cachedRegex;
     }
 }
@@ -123,6 +204,7 @@ public sealed class PluginDefinition : INotifyPropertyChanged
     public string Description { get; set; } = string.Empty;
     public string SourceFile { get; set; } = string.Empty;
     public List<PluginRule> Rules { get; set; } = new();
+    public List<string> ValidationMessages { get; set; } = new();
 
     public bool Enabled
     {
@@ -154,6 +236,7 @@ public sealed class PluginDefinition : INotifyPropertyChanged
             Description = Description,
             SourceFile = SourceFile,
             Enabled = Enabled,
+            ValidationMessages = ValidationMessages.ToList(),
             Rules = Rules.Select(rule => new PluginRule
             {
                 Id = rule.Id,
@@ -248,6 +331,7 @@ public sealed class ScanResult
     public DateTime ScannedAt { get; set; }
     public List<DependencyComponent> Components { get; set; } = new();
     public List<Finding> Findings { get; set; } = new();
+    public List<ScanDiagnostic> Diagnostics { get; set; } = new();
     public ScanSummary Summary { get; set; } = new();
     public GateDecision GateDecision { get; set; } = new();
     public SbomDocument Sbom { get; set; } = new();
