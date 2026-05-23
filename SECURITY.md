@@ -13,8 +13,15 @@ Current security boundaries:
 - It scans local project dependency manifest files.
 - It does not execute dependencies from the scanned project.
 - It does not modify the scanned project source code.
-- It only writes reports or SBOM files when the user explicitly exports them.
+- It writes reports, SBOM files, validation results, or vulnerability query results only when the user explicitly exports them or passes an output path to the CLI.
 - Plugin files are read from the local `plugins/` directory and interpreted as JSON rule definitions.
+- Plugin regex matching uses a timeout to reduce the risk of inefficient or malicious regular expressions blocking scans.
+- OSV vulnerability lookup is opt-in and only runs when the user explicitly passes `--vuln` to the CLI.
+- GitHub Security Advisory identifiers are currently surfaced through OSV `GHSA-*` aliases; the project does not call the GitHub Advisory GraphQL API directly.
+
+## Network Behavior
+
+Default desktop scanning and default CLI scanning are local-first and do not require network access. Network access is used only for explicit online vulnerability lookup through OSV.
 
 ## Reporting a Vulnerability
 
@@ -32,8 +39,8 @@ Please include:
 
 The following work items are recommended for future versions:
 
-- Add automated security scanning in CI.
-- Add schema validation for plugin JSON files.
-- Add regex timeout handling for plugin rules using regular expressions.
-- Add scan diagnostics instead of silently ignoring parser failures.
 - Add signed release artifacts and checksums.
+- Add official CycloneDX JSON Schema based validation.
+- Add scan diagnostics instead of silently ignoring parser failures.
+- Add direct GitHub Advisory GraphQL integration for authenticated environments.
+- Add desktop UI support for vulnerability query results.
