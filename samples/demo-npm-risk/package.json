@@ -1,0 +1,18 @@
+{
+  "name": "shadowguard-demo-npm-risk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A demo npm workspace for ShadowGuard dependency risk scanning.",
+  "scripts": {
+    "test": "echo \"This project is only used as a ShadowGuard scan sample.\""
+  },
+  "dependencies": {
+    "event-stream": "3.3.6",
+    "ua-parser-js": "0.7.29",
+    "left-pad": "latest",
+    "lodash": "4.17.21"
+  },
+  "devDependencies": {
+    "typescript": "5.0.0-rc.1"
+  }
+}
