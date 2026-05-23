@@ -271,7 +271,7 @@ shadowguard/
 ├─ ShadowGuard/                 WPF 桌面应用
 ├─ ShadowGuard.Core/            可复用扫描、评分、SBOM 与安全闸门核心类库
 ├─ ShadowGuard.Cli/             命令行扫描工具
-├─ ShadowGuard.Tests/           轻量级行为验证项目
+├─ ShadowGuard.Tests/           xUnit 自动化测试项目
 ├─ package/                     Windows 安装包脚本
 ├─ plugins/                     本地 JSON 插件规则
 ├─ samples/                     示例项目
@@ -290,7 +290,7 @@ shadowguard/
 - `ShadowGuard.Core`：提供核心扫描器、风险评分、SBOM 构建、安全闸门和插件规则能力，适合被 CLI、测试项目和第三方程序引用。
 - `ShadowGuard.Cli`：基于 `ShadowGuard.Core` 的命令行入口，适合脚本和 CI/CD 使用。
 - `ShadowGuard`：WPF 桌面应用，提供图形界面、结果展示、报告导出和插件操作。
-- `ShadowGuard.Tests`：轻量级核心行为验证项目，用于 CI 中快速检查关键逻辑。
+- `ShadowGuard.Tests`：基于 xUnit 的自动化测试项目，用于验证核心评分、闸门策略和插件匹配逻辑。
 
 ## 开发与验证
 
@@ -300,10 +300,10 @@ shadowguard/
 dotnet build .\shadowguard.sln --configuration Release
 ```
 
-运行轻量级验证：
+运行 xUnit 测试：
 
 ```powershell
-dotnet run --project .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release
+dotnet test .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release
 ```
 
 运行 CLI smoke test：
@@ -318,7 +318,7 @@ dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Re
 .\tools\Count-CodeLines.ps1
 ```
 
-CI 工作流会自动执行恢复依赖、构建、轻量级验证、CLI smoke test、源码行数统计、发布产物完整性检查、便携版发布和安装包构建。
+CI 工作流会自动执行恢复依赖、构建、xUnit 测试、CLI smoke test、源码行数统计、发布产物完整性检查、便携版发布和安装包构建。
 
 ## 安全说明
 
