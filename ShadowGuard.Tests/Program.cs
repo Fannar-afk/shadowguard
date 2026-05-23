@@ -1,221 +1,211 @@
 using ShadowGuard;
+using Xunit;
 
-var failures = new List<string>();
+namespace ShadowGuard.Tests;
 
-CheckSeverityMapping(failures);
-CheckGateDecisionPass(failures);
-CheckGateDecisionBlockOnScore(failures);
-CheckGateDecisionBlockOnMalicious(failures);
-CheckGateDecisionBlockOnLicenseRisk(failures);
-CheckGateDecisionWarnOnSource(failures);
-CheckPluginRuleMatching(failures);
-CheckPluginRegexRuleMatching(failures);
-CheckPluginVersionPatternMatching(failures);
-CheckPluginRuleDoesNotMatchEmptyPattern(failures);
-CheckPluginInvalidRegexDoesNotCrash(failures);
-
-if (failures.Count > 0)
+public sealed class SeverityHelperTests
 {
-    Console.Error.WriteLine("ShadowGuard lightweight verification failed:");
-    foreach (var failure in failures)
+    [Theory]
+    [InlineData(0, SeverityLevel.None)]
+    [InlineData(18, SeverityLevel.Low)]
+    [InlineData(42, SeverityLevel.Medium)]
+    [InlineData(78, SeverityLevel.High)]
+    [InlineData(92, SeverityLevel.Critical)]
+    public void FromScore_MapsExpectedSeverity(double score, SeverityLevel expected)
     {
-        Console.Error.WriteLine("- " + failure);
+        Assert.Equal(expected, SeverityHelper.FromScore(score));
+    }
+}
+
+public sealed class GateDecisionServiceTests
+{
+    [Fact]
+    public void Evaluate_CleanScan_ReturnsPass()
+    {
+        var result = new ScanResult
+        {
+            Summary = new ScanSummary { OverallScore = 0, HighCount = 0, CriticalCount = 0 },
+            Findings = new List<Finding>()
+        };
+
+        var decision = new GateDecisionService().Evaluate(result, new ScanPolicy());
+
+        Assert.Equal(GateOutcome.Pass, decision.Outcome);
     }
 
-    Environment.Exit(1);
-}
-
-Console.WriteLine("ShadowGuard lightweight verification passed.");
-
-static void CheckSeverityMapping(List<string> failures)
-{
-    Expect(SeverityHelper.FromScore(0) == SeverityLevel.None, "score 0 should map to None", failures);
-    Expect(SeverityHelper.FromScore(18) == SeverityLevel.Low, "score 18 should map to Low", failures);
-    Expect(SeverityHelper.FromScore(42) == SeverityLevel.Medium, "score 42 should map to Medium", failures);
-    Expect(SeverityHelper.FromScore(78) == SeverityLevel.High, "score 78 should map to High", failures);
-    Expect(SeverityHelper.FromScore(92) == SeverityLevel.Critical, "score 92 should map to Critical", failures);
-}
-
-static void CheckGateDecisionPass(List<string> failures)
-{
-    var result = new ScanResult
+    [Fact]
+    public void Evaluate_ScoreAboveThreshold_ReturnsBlock()
     {
-        Summary = new ScanSummary { OverallScore = 0, HighCount = 0, CriticalCount = 0 },
-        Findings = new List<Finding>()
-    };
-
-    var decision = new GateDecisionService().Evaluate(result, new ScanPolicy());
-    Expect(decision.Outcome == GateOutcome.Pass, "clean scan should pass", failures);
-}
-
-static void CheckGateDecisionBlockOnScore(List<string> failures)
-{
-    var result = new ScanResult
-    {
-        Summary = new ScanSummary { OverallScore = 80 },
-        Findings = new List<Finding>()
-    };
-
-    var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { BlockScoreThreshold = 70 });
-    Expect(decision.Outcome == GateOutcome.Block, "score above threshold should block", failures);
-}
-
-static void CheckGateDecisionBlockOnMalicious(List<string> failures)
-{
-    var result = new ScanResult
-    {
-        Summary = new ScanSummary { OverallScore = 20 },
-        Findings = new List<Finding>
+        var result = new ScanResult
         {
-            new()
+            Summary = new ScanSummary { OverallScore = 80 },
+            Findings = new List<Finding>()
+        };
+
+        var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { BlockScoreThreshold = 70 });
+
+        Assert.Equal(GateOutcome.Block, decision.Outcome);
+    }
+
+    [Fact]
+    public void Evaluate_HighMaliciousFindingWhenPolicyEnabled_ReturnsBlock()
+    {
+        var result = new ScanResult
+        {
+            Summary = new ScanSummary { OverallScore = 20 },
+            Findings = new List<Finding>
             {
-                Category = "Malicious",
-                Severity = SeverityLevel.High,
-                Score = 80,
-                RuleName = "Historical incident package"
+                new()
+                {
+                    Category = "Malicious",
+                    Severity = SeverityLevel.High,
+                    Score = 80,
+                    RuleName = "Historical incident package"
+                }
             }
-        }
-    };
+        };
 
-    var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { BlockOnMalicious = true });
-    Expect(decision.Outcome == GateOutcome.Block, "high malicious finding should block when policy is enabled", failures);
-}
+        var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { BlockOnMalicious = true });
 
-static void CheckGateDecisionBlockOnLicenseRisk(List<string> failures)
-{
-    var result = new ScanResult
+        Assert.Equal(GateOutcome.Block, decision.Outcome);
+    }
+
+    [Fact]
+    public void Evaluate_MediumLicenseFindingWhenPolicyEnabled_ReturnsBlock()
     {
-        Summary = new ScanSummary { OverallScore = 20 },
-        Findings = new List<Finding>
+        var result = new ScanResult
         {
-            new()
+            Summary = new ScanSummary { OverallScore = 20 },
+            Findings = new List<Finding>
             {
-                Category = "License",
-                Severity = SeverityLevel.Medium,
-                Score = 55,
-                RuleName = "License risk"
+                new()
+                {
+                    Category = "License",
+                    Severity = SeverityLevel.Medium,
+                    Score = 55,
+                    RuleName = "License risk"
+                }
             }
-        }
-    };
+        };
 
-    var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { BlockOnLicenseRisk = true });
-    Expect(decision.Outcome == GateOutcome.Block, "medium license finding should block when policy is enabled", failures);
-}
+        var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { BlockOnLicenseRisk = true });
 
-static void CheckGateDecisionWarnOnSource(List<string> failures)
-{
-    var result = new ScanResult
+        Assert.Equal(GateOutcome.Block, decision.Outcome);
+    }
+
+    [Fact]
+    public void Evaluate_SourceRiskWhenWarnPolicyEnabled_ReturnsWarn()
     {
-        Summary = new ScanSummary { OverallScore = 10 },
-        Findings = new List<Finding>
+        var result = new ScanResult
         {
-            new() { Category = "Source", Severity = SeverityLevel.Medium, Score = 48 }
-        }
-    };
+            Summary = new ScanSummary { OverallScore = 10 },
+            Findings = new List<Finding>
+            {
+                new() { Category = "Source", Severity = SeverityLevel.Medium, Score = 48 }
+            }
+        };
 
-    var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { WarnOnUnknownSource = true });
-    Expect(decision.Outcome == GateOutcome.Warn, "source risk should warn when enabled", failures);
+        var decision = new GateDecisionService().Evaluate(result, new ScanPolicy { WarnOnUnknownSource = true });
+
+        Assert.Equal(GateOutcome.Warn, decision.Outcome);
+    }
 }
 
-static void CheckPluginRuleMatching(List<string> failures)
+public sealed class PluginRuleTests
 {
-    var component = new DependencyComponent
+    [Fact]
+    public void Matches_SupportsExactContainsAndEcosystemRules()
     {
-        Name = "event-stream",
-        Version = "1.0.0",
-        SourceType = "Registry",
-        Ecosystem = "npm"
-    };
+        var component = new DependencyComponent
+        {
+            Name = "event-stream",
+            Version = "1.0.0",
+            SourceType = "Registry",
+            Ecosystem = "npm"
+        };
 
-    var exact = new PluginRule { MatchType = "ExactName", Pattern = "event-stream" };
-    var contains = new PluginRule { MatchType = "ContainsName", Pattern = "stream" };
-    var ecosystem = new PluginRule { MatchType = "Ecosystem", Pattern = "npm" };
+        Assert.True(new PluginRule { MatchType = "ExactName", Pattern = "event-stream" }.Matches(component));
+        Assert.True(new PluginRule { MatchType = "ContainsName", Pattern = "stream" }.Matches(component));
+        Assert.True(new PluginRule { MatchType = "Ecosystem", Pattern = "npm" }.Matches(component));
+    }
 
-    Expect(exact.Matches(component), "ExactName rule should match component name", failures);
-    Expect(contains.Matches(component), "ContainsName rule should match component name", failures);
-    Expect(ecosystem.Matches(component), "Ecosystem rule should match component ecosystem", failures);
-}
-
-static void CheckPluginRegexRuleMatching(List<string> failures)
-{
-    var component = new DependencyComponent
+    [Fact]
+    public void Matches_SupportsRegexNameRules()
     {
-        Name = "shadowguard-demo-package",
-        Version = "1.0.0",
-        SourceType = "Registry",
-        Ecosystem = "npm"
-    };
+        var component = new DependencyComponent
+        {
+            Name = "shadowguard-demo-package",
+            Version = "1.0.0",
+            SourceType = "Registry",
+            Ecosystem = "npm"
+        };
 
-    var regex = new PluginRule
+        var rule = new PluginRule
+        {
+            MatchType = "RegexName",
+            Pattern = "^shadowguard-.*-package$"
+        };
+
+        Assert.True(rule.Matches(component));
+    }
+
+    [Fact]
+    public void Matches_SupportsVersionPatternRules()
     {
-        MatchType = "RegexName",
-        Pattern = "^shadowguard-.*-package$"
-    };
+        var component = new DependencyComponent
+        {
+            Name = "typescript",
+            Version = "5.0.0-rc.1",
+            SourceType = "Registry",
+            Ecosystem = "npm"
+        };
 
-    Expect(regex.Matches(component), "RegexName rule should match package name", failures);
-}
+        var rule = new PluginRule
+        {
+            MatchType = "VersionPattern",
+            Pattern = "(?i)(alpha|beta|rc|preview)"
+        };
 
-static void CheckPluginVersionPatternMatching(List<string> failures)
-{
-    var component = new DependencyComponent
+        Assert.True(rule.Matches(component));
+    }
+
+    [Fact]
+    public void Matches_EmptyPattern_ReturnsFalse()
     {
-        Name = "typescript",
-        Version = "5.0.0-rc.1",
-        SourceType = "Registry",
-        Ecosystem = "npm"
-    };
+        var component = new DependencyComponent
+        {
+            Name = "lodash",
+            Version = "4.17.21",
+            SourceType = "Registry",
+            Ecosystem = "npm"
+        };
 
-    var versionPattern = new PluginRule
+        var rule = new PluginRule
+        {
+            MatchType = "ContainsName",
+            Pattern = ""
+        };
+
+        Assert.False(rule.Matches(component));
+    }
+
+    [Fact]
+    public void Matches_InvalidRegex_DoesNotThrowAndReturnsFalse()
     {
-        MatchType = "VersionPattern",
-        Pattern = "(?i)(alpha|beta|rc|preview)"
-    };
+        var component = new DependencyComponent
+        {
+            Name = "lodash",
+            Version = "4.17.21",
+            SourceType = "Registry",
+            Ecosystem = "npm"
+        };
 
-    Expect(versionPattern.Matches(component), "VersionPattern rule should match pre-release version", failures);
-}
+        var rule = new PluginRule
+        {
+            MatchType = "RegexName",
+            Pattern = "(invalid"
+        };
 
-static void CheckPluginRuleDoesNotMatchEmptyPattern(List<string> failures)
-{
-    var component = new DependencyComponent
-    {
-        Name = "lodash",
-        Version = "4.17.21",
-        SourceType = "Registry",
-        Ecosystem = "npm"
-    };
-
-    var emptyPatternRule = new PluginRule
-    {
-        MatchType = "ContainsName",
-        Pattern = ""
-    };
-
-    Expect(!emptyPatternRule.Matches(component), "plugin rule with empty pattern should not match", failures);
-}
-
-static void CheckPluginInvalidRegexDoesNotCrash(List<string> failures)
-{
-    var component = new DependencyComponent
-    {
-        Name = "lodash",
-        Version = "4.17.21",
-        SourceType = "Registry",
-        Ecosystem = "npm"
-    };
-
-    var invalidRegexRule = new PluginRule
-    {
-        MatchType = "RegexName",
-        Pattern = "(invalid"
-    };
-
-    Expect(!invalidRegexRule.Matches(component), "invalid regex rule should not crash and should not match", failures);
-}
-
-static void Expect(bool condition, string message, List<string> failures)
-{
-    if (!condition)
-    {
-        failures.Add(message);
+        Assert.False(rule.Matches(component));
     }
 }
