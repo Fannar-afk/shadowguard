@@ -35,7 +35,7 @@ jobs:
         run: dotnet test .\ShadowGuard.Tests\ShadowGuard.Tests.csproj --configuration Release --no-build --logger trx --results-directory .\artifacts\test-results
 
       - name: Run CLI smoke test
-        run: dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Release --no-build -- --path .\samples\demo-npm-risk --plugins .\plugins --out .\artifacts\cli-report.json
+        run: dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj --configuration Release --no-build -- --path .\samples\demo-npm-risk --plugins .\plugins --validate-sbom --fail-on-invalid-sbom --out .\artifacts\cli-report.json
 
       - name: Count source lines
         shell: pwsh
