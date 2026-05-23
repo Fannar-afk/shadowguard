@@ -209,3 +209,78 @@ public sealed class PluginRuleTests
         Assert.False(rule.Matches(component));
     }
 }
+
+public sealed class CycloneDxValidatorTests
+{
+    [Fact]
+    public void Validate_ValidSbom_ReturnsValidResult()
+    {
+        var document = new SbomDocument
+        {
+            BomFormat = "CycloneDX",
+            SpecVersion = "1.5",
+            Version = 1,
+            SerialNumber = "urn:uuid:11111111-1111-1111-1111-111111111111",
+            Metadata = new SbomMetadata
+            {
+                Timestamp = DateTimeOffset.UtcNow.ToString("O"),
+                ProjectName = "demo"
+            },
+            Components = new List<SbomComponent>
+            {
+                new()
+                {
+                    Type = "library",
+                    Name = "lodash",
+                    Version = "4.17.21",
+                    BomRef = "pkg-npm-lodash",
+                    Purl = "pkg:npm/lodash@4.17.21",
+                    Scope = "required"
+                }
+            }
+        };
+
+        var result = new CycloneDxValidator().Validate(document);
+
+        Assert.True(result.IsValid);
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void Validate_InvalidBomFormat_ReturnsError()
+    {
+        var document = new SbomDocument
+        {
+            BomFormat = "Unknown",
+            SpecVersion = "1.5",
+            Version = 1,
+            Components = new List<SbomComponent>()
+        };
+
+        var result = new CycloneDxValidator().Validate(document);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("bomFormat", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Validate_DuplicateBomRef_ReturnsError()
+    {
+        var document = new SbomDocument
+        {
+            BomFormat = "CycloneDX",
+            SpecVersion = "1.5",
+            Version = 1,
+            Components = new List<SbomComponent>
+            {
+                new() { Type = "library", Name = "a", Version = "1.0.0", BomRef = "duplicate", Scope = "required" },
+                new() { Type = "library", Name = "b", Version = "1.0.0", BomRef = "duplicate", Scope = "required" }
+            }
+        };
+
+        var result = new CycloneDxValidator().Validate(document);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("duplicate bom-ref", StringComparison.OrdinalIgnoreCase));
+    }
+}
