@@ -1,8 +1,8 @@
-﻿# Samples
+# Samples
 
-当前目录提供两个可直接用于 ShadowGuard 的演示项目：
+This directory contains demo projects that can be scanned directly with ShadowGuard:
 
-- `demo-node/`：适合快速体验 npm 与 requirements 扫描
-- `demo-workspace/`：包含 npm、package-lock、yarn、pnpm、requirements、go.mod、Cargo.toml、composer.json、pom.xml、csproj 的多生态示例
+- `demo-node/`: a lightweight sample for npm and requirements scanning.
+- `demo-workspace/`: a multi-ecosystem sample that includes npm, package-lock, yarn, pnpm, requirements, go.mod, Cargo.toml, composer.json, pom.xml, and csproj files.
 
-建议优先在应用中选择 `samples/demo-workspace` 目录进行完整体验。
+For a complete demo, start with the `samples/demo-workspace` directory in the desktop app or CLI.
