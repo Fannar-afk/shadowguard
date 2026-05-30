@@ -2,23 +2,25 @@
 
 ![CI](https://github.com/Fannar-afk/shadowguard/actions/workflows/ci.yml/badge.svg)
 
-ShadowGuard 是一款基于 .NET 6 的本地供应链安全分析工具，包含 Windows 桌面端、命令行工具和可复用核心类库。它面向本地开发、联调、发布前检查和 CI/CD 集成场景，帮助开发者扫描项目依赖清单、识别潜在风险、生成 SBOM、校验 CycloneDX 结构，并可选择接入 OSV 漏洞数据源查询公开漏洞信息。
+ShadowGuard 是一款面向软件供应链安全场景的本地化依赖风险分析工具。它可以在项目开发、测试和发布前，对第三方依赖进行扫描、识别和风险评估，帮助开发者了解项目中使用了哪些依赖组件、这些依赖是否存在潜在风险，并生成可用于交付、审计和自动化检查的安全报告。
 
-ShadowGuard 专注于本地静态分析：不会执行被扫描项目中的代码，也不会主动修改被扫描项目源码。所有报告、SBOM 和漏洞查询结果都需要用户主动导出或通过命令行参数指定后才会写入磁盘。
+项目采用 **桌面端应用 + 命令行工具 + 核心类库** 的三层结构：
 
-## 功能特性
+- **ShadowGuard**：Windows 桌面端应用，适合普通用户通过图形界面完成项目扫描、风险查看和报告导出。
+- **shadowguard-cli**：命令行工具，适合接入 PowerShell、GitHub Actions、Jenkins 等自动化流程。
+- **ShadowGuard.Core**：核心类库，适合第三方 .NET 程序复用依赖扫描、风险分析、SBOM 生成和安全闸门判断能力。
 
-- **桌面端使用**：提供 Windows WPF 图形界面，支持选择目录、加载示例、开始扫描、查看风险、导出报告和 SBOM。
-- **命令行使用**：安装包和便携版内置 `shadowguard-cli.exe`，可用于脚本、自动化检查和 CI/CD 集成。
-- **核心类库复用**：`ShadowGuard.Core` 提供扫描、评分、SBOM、漏洞查询与安全闸门能力，可被第三方 .NET 程序引用。
-- **多生态依赖扫描**：自动识别 npm、Python、Go、.NET 等项目中的常见依赖清单；桌面端保留更完整的多生态扫描能力。
-- **风险发现与处置建议**：识别可疑来源、未固定版本、预发布版本、历史供应链事件相关依赖等风险信号，并给出处理建议。
-- **SBOM 生成与校验**：生成 CycloneDX 1.5 风格 SBOM，并提供核心结构校验。
-- **漏洞数据源接入**：CLI 支持可选接入 OSV 查询漏洞；返回结果中的 `CVE-*` 与 `GHSA-*` aliases 可用于关联 CVE 与 GitHub Security Advisory 编号。
-- **插件规则扩展**：支持从本地 `plugins/` 目录加载 JSON 规则包。
-- **安装包与便携版构建**：通过 GitHub Actions 自动生成 Windows 安装包、win-x64 便携版产物和 SHA256 校验文件。
+ShadowGuard 专注于本地静态分析：默认不会执行被扫描项目中的代码，也不会主动修改被扫描项目源码。报告、SBOM 和漏洞查询结果只有在用户主动导出，或通过命令行参数指定输出路径时，才会写入磁盘。
 
-## 支持的依赖清单
+## 核心功能
+
+ShadowGuard 的功能可以概括为三部分：**依赖扫描与风险分析、SBOM 与安全闸门、插件扩展与漏洞数据关联**。
+
+### 1. 项目依赖扫描与供应链风险分析
+
+ShadowGuard 可以扫描本地项目目录，自动识别常见依赖清单文件，并提取依赖名称、版本号、生态类型、来源信息和证据文件。
+
+当前支持识别的依赖文件包括：
 
 | 生态 | 支持文件 |
 | --- | --- |
@@ -32,10 +34,105 @@ ShadowGuard 专注于本地静态分析：不会执行被扫描项目中的代�
 
 说明：桌面端保留原有完整扫描器；`ShadowGuard.Core` 与 `ShadowGuard.Cli` 当前优先支持 npm、Python、Go 和 .NET 的核心扫描能力，后续会继续与桌面端扫描能力对齐。
 
+扫描时，工具会自动跳过 `.git`、`node_modules`、`bin`、`obj`、`dist`、`build`、虚拟环境目录等常见无关目录，减少构建产物、缓存目录和第三方源码对扫描结果的干扰。
+
+在识别依赖后，ShadowGuard 会基于内置规则进行供应链风险分析，包括但不限于：
+
+- 历史高风险或供应链事件相关依赖
+- 未固定版本依赖，例如 `latest`
+- 预发布版本依赖，例如 `alpha`、`beta`、`rc`
+- Git、URL 等异常来源依赖
+- 许可证或来源不明确的依赖
+
+每个风险项会给出风险等级、风险分、风险说明和处理建议，帮助开发者快速判断哪些依赖需要优先处理。
+
+### 2. SBOM 生成、校验与安全闸门判断
+
+ShadowGuard 可以根据扫描结果生成 CycloneDX 1.5 风格的 SBOM（Software Bill of Materials，软件物料清单），用于记录项目中的第三方组件信息。
+
+生成的 SBOM 主要包含：
+
+- 项目信息
+- 组件名称与版本
+- 组件生态类型
+- PURL 信息
+- 依赖来源
+- 风险等级与风险分
+- 证据文件路径
+
+SBOM 可用于项目交付、安全审计、合规检查或后续安全平台处理。
+
+ShadowGuard 还提供 SBOM 核心结构校验能力，可以检查：
+
+- `bomFormat`
+- `specVersion`
+- `metadata`
+- `components`
+- `bom-ref`
+- `purl`
+- 组件名称、版本和类型
+- 组件 scope 等关键字段
+
+除 SBOM 外，ShadowGuard 会根据整体风险情况生成安全闸门结论：
+
+| 结论 | 含义 |
+| --- | --- |
+| Pass | 未发现明显风险，项目可继续发布。 |
+| Warn | 存在需要人工复核的问题。 |
+| Block | 命中高风险策略，不建议继续发布。 |
+
+在 CI/CD 场景中，可以通过命令行参数让工具在风险达到阻断条件时返回非零退出码，从而终止后续构建或发布流程。
+
+### 3. 插件规则扩展与漏洞数据关联
+
+ShadowGuard 支持通过本地 JSON 插件规则扩展风险识别逻辑。用户可以在 `plugins/` 目录下维护自定义规则，无需修改源码即可扩展风险判断能力。
+
+插件规则可以匹配：
+
+- 依赖名称
+- 版本号
+- 来源类型
+- 生态类型
+- 正则表达式规则
+- 预发布版本模式
+- 自定义风险分和处理建议
+
+插件规则示例：
+
+```json
+{
+  "pluginId": "custom-risk-rules",
+  "displayName": "Custom Risk Rules",
+  "version": "1.0.0",
+  "author": "ShadowGuard",
+  "description": "Local dependency risk rules.",
+  "enabled": true,
+  "rules": [
+    {
+      "id": "custom.block.package",
+      "name": "Blocked package name",
+      "matchType": "ExactName",
+      "pattern": "example-risky-package",
+      "severity": "High",
+      "score": 75,
+      "category": "Plugin",
+      "message": "This package is blocked by a local rule.",
+      "recommendation": "Replace it with an approved package."
+    }
+  ]
+}
+```
+
+此外，ShadowGuard.Cli 支持可选接入 OSV 漏洞数据库。用户显式启用 `--vuln` 参数后，工具会根据依赖名称和版本查询公开漏洞信息，并输出漏洞编号、摘要、组件名称、版本、CVE / GHSA 别名等信息。
+
+默认情况下，ShadowGuard 不会自动联网。只有在命令行中显式传入 `--vuln` 参数时，才会执行在线漏洞查询。项目当前通过 OSV 返回结果中的 `CVE-*` 与 `GHSA-*` aliases 关联漏洞编号，没有直接调用需要认证的 GitHub Advisory GraphQL API。
+
 ## 运行环境
 
 - 普通用户使用安装包或自包含便携版时，无需单独安装 .NET SDK。
 - 源码构建需要 Windows 10/11、.NET 6 SDK、支持 WPF 的 Windows 桌面环境和 PowerShell。
+- 开发工具推荐 Visual Studio 2022 或 VS Code。
+- 安装包构建需要 Inno Setup。
 
 ## 安装方式
 
@@ -77,10 +174,10 @@ Get-Content .\SHA256SUMS.txt
 
 ### 使用桌面端扫描示例项目
 
-1. 启动 ShadowGuard。
+1. 启动 `ShadowGuard.exe`。
 2. 点击 **加载示例**，载入内置示例项目。
 3. 点击 **开始扫描**。
-4. 查看风险发现、组件清单、SBOM 预览和安全闸门结果。
+4. 查看依赖列表、风险说明、处理建议和安全闸门结果。
 5. 根据需要导出扫描报告或 SBOM JSON。
 
 ### 使用桌面端扫描自己的项目
@@ -89,16 +186,15 @@ Get-Content .\SHA256SUMS.txt
 2. 选择待扫描项目的根目录。
 3. 点击 **开始扫描**。
 4. 在界面中查看依赖风险、证据文件、处理建议和最终闸门结论。
+5. 根据结果决定继续发布、人工复核或修复依赖问题。
 
-## 命令行使用
+### 使用 CLI 扫描项目
 
 `shadowguard-cli.exe` 适合脚本、自动化检查和 CI/CD 集成。安装版默认位于：
 
 ```text
 C:\Program Files\ShadowGuard\shadowguard-cli.exe
 ```
-
-### 安装后直接运行
 
 扫描安装目录中的示例项目并输出报告：
 
@@ -107,58 +203,135 @@ cd "C:\Program Files\ShadowGuard"
 .\shadowguard-cli.exe --path .\samples\demo-npm-risk --plugins .\plugins
 ```
 
-校验 CycloneDX SBOM 并将报告输出到桌面：
-
-```powershell
-cd "C:\Program Files\ShadowGuard"
-.\shadowguard-cli.exe `
-  --path .\samples\demo-npm-risk `
-  --plugins .\plugins `
-  --validate-sbom `
-  --fail-on-invalid-sbom `
-  --out "$env:USERPROFILE\Desktop\validated-report.json"
-```
-
-导出 SBOM：
-
-```powershell
-.\shadowguard-cli.exe --path .\samples\demo-npm-risk --plugins .\plugins --format sbom --out "$env:USERPROFILE\Desktop\sbom.json"
-```
-
-查询 OSV 漏洞数据：
-
-```powershell
-.\shadowguard-cli.exe --path .\samples\demo-npm-risk --plugins .\plugins --vuln --vuln-provider osv --out "$env:USERPROFILE\Desktop\vulnerability-report.json"
-```
-
-### 从源码运行 CLI
-
-源码开发环境中也可以通过 `dotnet run` 执行 CLI：
+从源码运行 CLI：
 
 ```powershell
 dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj -- --path .\samples\demo-npm-risk --plugins .\plugins
 ```
 
-常用参数：
+## 命令行使用
+
+### 基础扫描
+
+```powershell
+.\shadowguard-cli.exe `
+  --path .\samples\demo-npm-risk `
+  --plugins .\plugins `
+  --out .\artifacts\report.json
+```
+
+### 生成 SBOM
+
+```powershell
+.\shadowguard-cli.exe `
+  --path .\samples\demo-npm-risk `
+  --plugins .\plugins `
+  --format sbom `
+  --out .\artifacts\sbom.json
+```
+
+### 校验 SBOM
+
+校验 CycloneDX SBOM，并在校验失败时返回非零退出码：
+
+```powershell
+.\shadowguard-cli.exe `
+  --path .\samples\demo-npm-risk `
+  --plugins .\plugins `
+  --validate-sbom `
+  --fail-on-invalid-sbom `
+  --out .\artifacts\validated-report.json
+```
+
+### 安全闸门阻断发布
+
+当安全闸门结果为 Block 时返回非零退出码：
+
+```powershell
+.\shadowguard-cli.exe `
+  --path .\samples\demo-npm-risk `
+  --plugins .\plugins `
+  --fail-on-block
+```
+
+### 查询 OSV 漏洞数据
+
+```powershell
+.\shadowguard-cli.exe `
+  --path .\samples\demo-npm-risk `
+  --plugins .\plugins `
+  --vuln `
+  --vuln-provider osv `
+  --out .\artifacts\vulnerability-report.json
+```
+
+发现漏洞时阻断流程：
+
+```powershell
+.\shadowguard-cli.exe `
+  --path .\samples\demo-npm-risk `
+  --plugins .\plugins `
+  --vuln `
+  --vuln-provider osv `
+  --fail-on-vulnerability
+```
+
+### 常用参数
 
 | 参数 | 说明 |
 | --- | --- |
-| `--path` / `-p` | 待扫描项目目录 |
-| `--plugins` | 插件规则目录 |
-| `--out` / `-o` | JSON 输出文件路径 |
-| `--format` | 输出格式，支持 `report`、`sbom`、`validation`、`vuln` |
-| `--validate-sbom` | 对生成的 CycloneDX SBOM 执行结构校验 |
+| `--path` / `-p` | 指定待扫描项目目录 |
+| `--plugins` | 指定本地插件规则目录 |
+| `--out` / `-o` | 指定 JSON 输出路径 |
+| `--format` | 指定输出格式，支持 `report`、`sbom`、`validation`、`vuln` |
+| `--validate-sbom` | 启用 CycloneDX 1.5 风格 SBOM 核心结构校验 |
 | `--fail-on-invalid-sbom` | SBOM 校验失败时返回非零退出码 |
+| `--fail-on-block` | 安全闸门结果为 Block 时返回非零退出码 |
+| `--fail-on-warn` | 安全闸门结果为 Warn 或 Block 时返回非零退出码 |
+| `--block-threshold` | 触发阻断的综合风险分阈值 |
 | `--vuln` | 启用漏洞数据查询 |
 | `--vuln-provider` | 漏洞数据源，当前支持 `osv` |
 | `--fail-on-vulnerability` | 查询到漏洞时返回非零退出码 |
-| `--block-threshold` | 触发阻断的综合风险分阈值 |
-| `--fail-on-block` | 安全闸门为 Block 时返回非零退出码 |
-| `--fail-on-warn` | 安全闸门为 Warn 或 Block 时返回非零退出码 |
 
-## OSV 与 GitHub Advisory 说明
+## 作为 .NET 类库集成
 
-当前版本通过 OSV API 进行在线漏洞查询。OSV 返回的漏洞结果中可能包含 `CVE-*`、`GHSA-*` 等 aliases；其中 `GHSA-*` 编号可用于关联 GitHub Security Advisory。项目当前没有直接调用需要认证的 GitHub Advisory GraphQL API，也不会在用户未启用 `--vuln` 时自动联网。
+ShadowGuard 的核心扫描能力封装在 `ShadowGuard.Core` 中，第三方 .NET 程序可以通过项目引用或 DLL 引用方式接入。
+
+在 `.csproj` 中添加引用：
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\ShadowGuard.Core\ShadowGuard.Core.csproj" />
+</ItemGroup>
+```
+
+在 C# 代码中调用：
+
+```csharp
+using ShadowGuard;
+
+var engine = new ShadowGuardEngine();
+
+var result = engine.Scan(
+    targetPath: @"D:\Projects\demo-project"
+);
+
+Console.WriteLine(result.Summary.TotalDependencies);
+Console.WriteLine(result.GateDecision.Outcome);
+```
+
+这种方式适合将 ShadowGuard 集成到企业内部项目检查工具、实验教学平台、代码质量检测系统或发布审批系统中。
+
+## 适用场景
+
+ShadowGuard 适合用于以下场景：
+
+- 开源项目发布前的依赖风险检查
+- 企业内部项目的供应链安全预检查
+- CI/CD 构建流程中的安全闸门
+- 生成 SBOM 供交付、审计或合规检查使用
+- 对第三方依赖进行本地化风险分析
+- 教学、实验或安全工具链集成
 
 ## 从源码构建
 
@@ -210,38 +383,6 @@ $env:SHADOWGUARD_OUTPUT_DIR=(Resolve-Path '.\artifacts\installer').Path
 artifacts\installer\ShadowGuard-Setup.exe
 ```
 
-## 插件规则
-
-ShadowGuard 会从本地 `plugins/` 目录加载 JSON 规则包。插件在程序启动时加载，也可以在界面中点击 **重新加载插件** 手动刷新。
-
-支持的匹配方式：`ExactName`、`ContainsName`、`RegexName`、`SourceType`、`VersionPattern`、`Ecosystem`。
-
-插件规则示例：
-
-```json
-{
-  "pluginId": "custom-risk-rules",
-  "displayName": "Custom Risk Rules",
-  "version": "1.0.0",
-  "author": "ShadowGuard",
-  "description": "Local dependency risk rules.",
-  "enabled": true,
-  "rules": [
-    {
-      "id": "custom.block.package",
-      "name": "Blocked package name",
-      "matchType": "ExactName",
-      "pattern": "example-risky-package",
-      "severity": "High",
-      "score": 75,
-      "category": "Plugin",
-      "message": "This package is blocked by a local rule.",
-      "recommendation": "Replace it with an approved package."
-    }
-  ]
-}
-```
-
 ## 项目结构
 
 ```text
@@ -256,6 +397,15 @@ shadowguard/
 ├─ tools/                       工具脚本
 └─ .github/workflows/           GitHub Actions 工作流
 ```
+
+## 设计特点
+
+- **本地优先**：默认扫描不联网，适合本地项目和内网环境使用。
+- **可视化操作**：桌面端支持项目选择、扫描、风险查看和报告导出。
+- **自动化友好**：CLI 支持非零退出码，可接入 CI/CD 流程。
+- **规则可扩展**：通过 JSON 插件规则扩展风险识别逻辑。
+- **组件可复用**：核心能力封装为 .NET 类库，便于第三方程序集成。
+- **SBOM 支持**：可生成 CycloneDX 1.5 风格的软件物料清单。
 
 ## 开发与验证
 
