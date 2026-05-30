@@ -36,17 +36,14 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '6.0.x'
-          source-url: https://nuget.pkg.github.com/Fannar-afk/index.json
-        env:
-          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Restore
-        run: dotnet restore .\shadowguard.sln
+      - name: Restore core project
+        run: dotnet restore .\ShadowGuard.Core\ShadowGuard.Core.csproj
 
-      - name: Build
+      - name: Build core project
         run: dotnet build .\ShadowGuard.Core\ShadowGuard.Core.csproj --configuration Release --no-restore /p:Version=${{ inputs.version }}
 
-      - name: Pack
+      - name: Pack core project
         run: |
           New-Item -ItemType Directory -Force -Path .\artifacts\nuget | Out-Null
           dotnet pack .\ShadowGuard.Core\ShadowGuard.Core.csproj `
@@ -55,6 +52,18 @@ jobs:
             --output .\artifacts\nuget `
             /p:Version=${{ inputs.version }} `
             /p:PackageVersion=${{ inputs.version }}
+
+      - name: Configure GitHub Packages source
+        run: |
+          dotnet nuget remove source github 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            $global:LASTEXITCODE = 0
+          }
+          dotnet nuget add source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+            --name github `
+            --username "${{ github.actor }}" `
+            --password "${{ secrets.GITHUB_TOKEN }}" `
+            --store-password-in-clear-text
 
       - name: Publish to GitHub Packages
         run: dotnet nuget push .\artifacts\nuget\*.nupkg --source github --api-key $env:NUGET_AUTH_TOKEN --skip-duplicate
