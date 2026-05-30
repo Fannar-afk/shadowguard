@@ -242,6 +242,7 @@ public sealed class PluginService
 public sealed class ProjectScanner
 {
     private static readonly string[] IgnoredDirectoryNames = { ".git", "node_modules", "bin", "obj", "dist", "build", "target", ".venv", "venv" };
+    private static readonly Regex Pep508DirectReferenceRegex = new("^(?<name>[A-Za-z0-9_.\\-]+)\\s*@\\s*(?<source>.+)$", RegexOptions.Compiled);
     private static readonly Regex RequirementRegex = new("^(?<name>[A-Za-z0-9_.\\-]+)\\s*(?<operator>==|>=|<=|~=|>|<)?\\s*(?<version>.*)$", RegexOptions.Compiled);
 
     public List<DependencyComponent> DiscoverComponents(string targetPath)
@@ -333,6 +334,25 @@ public sealed class ProjectScanner
             var line = rawLine.Trim();
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || line.StartsWith("-"))
             {
+                continue;
+            }
+
+            // PEP 508 direct references ("name @ <url>") must be handled before the
+            // operator-based form, otherwise the URL is captured as the version and the
+            // Git/URL source type is lost.
+            var directReference = Pep508DirectReferenceRegex.Match(line);
+            if (directReference.Success)
+            {
+                var source = directReference.Groups["source"].Value.Trim();
+                AddOrUpdate(components, new DependencyComponent
+                {
+                    Name = directReference.Groups["name"].Value,
+                    Version = source,
+                    Ecosystem = "pip",
+                    IsDirect = true,
+                    SourceType = InferSourceType(source),
+                    EvidenceFiles = new List<string> { file }
+                });
                 continue;
             }
 
