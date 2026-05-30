@@ -5,5 +5,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ShadowGuard</RootNamespace>
     <AssemblyName>ShadowGuard.Core</AssemblyName>
+
+    <PackageId>ShadowGuard.Core</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Fannar-afk</Authors>
+    <Company>Fannar-afk</Company>
+    <Description>Core library for local software supply chain security scanning, dependency risk analysis, SBOM generation, and policy gate decisions.</Description>
+    <PackageTags>security;supply-chain;sbom;cyclonedx;dependency-scanning;osv</PackageTags>
+    <PackageProjectUrl>https://github.com/Fannar-afk/shadowguard</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Fannar-afk/shadowguard</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 </Project>
