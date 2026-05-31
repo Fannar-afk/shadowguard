@@ -568,6 +568,5 @@ public sealed class RiskScoringServiceTests
         var result = new RiskScoringService().BuildResult("demo-project", new[] { component }, new[] { plugin });
 
         Assert.Empty(result.Findings);
- main;
     }
 }
