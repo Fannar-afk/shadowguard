@@ -1,0 +1,84 @@
+name: ShadowGuard Scan
+description: Run ShadowGuard dependency risk scan in GitHub Actions.
+author: Fannar-afk
+
+inputs:
+  path:
+    description: Project directory to scan.
+    required: false
+    default: .
+  plugins:
+    description: Plugin rule directory.
+    required: false
+    default: plugins
+  output:
+    description: Output report path.
+    required: false
+    default: shadowguard-report.json
+  format:
+    description: Output format. Supported values include report, sbom, validation, vuln, and sarif.
+    required: false
+    default: report
+  validate-sbom:
+    description: Whether to validate the generated CycloneDX SBOM.
+    required: false
+    default: "false"
+  fail-on-invalid-sbom:
+    description: Return a non-zero exit code when SBOM validation fails.
+    required: false
+    default: "false"
+  fail-on-block:
+    description: Return a non-zero exit code when the security gate outcome is Block.
+    required: false
+    default: "false"
+  fail-on-warn:
+    description: Return a non-zero exit code when the security gate outcome is Warn or Block.
+    required: false
+    default: "false"
+  vuln:
+    description: Whether to query vulnerability data.
+    required: false
+    default: "false"
+  vuln-provider:
+    description: Vulnerability provider name.
+    required: false
+    default: osv
+  fail-on-vulnerability:
+    description: Return a non-zero exit code when vulnerabilities are found.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 6.0.x
+
+    - name: Restore ShadowGuard
+      shell: pwsh
+      run: dotnet restore ${{ github.action_path }}\shadowguard.sln
+
+    - name: Run ShadowGuard scan
+      shell: pwsh
+      run: |
+        $args = @(
+          '--project', '${{ github.action_path }}\ShadowGuard.Cli\ShadowGuard.Cli.csproj',
+          '--configuration', 'Release',
+          '--',
+          '--path', '${{ inputs.path }}',
+          '--plugins', '${{ inputs.plugins }}',
+          '--format', '${{ inputs.format }}',
+          '--out', '${{ inputs.output }}'
+        )
+
+        if ('${{ inputs.validate-sbom }}' -eq 'true') { $args += '--validate-sbom' }
+        if ('${{ inputs.fail-on-invalid-sbom }}' -eq 'true') { $args += '--fail-on-invalid-sbom' }
+        if ('${{ inputs.fail-on-block }}' -eq 'true') { $args += '--fail-on-block' }
+        if ('${{ inputs.fail-on-warn }}' -eq 'true') { $args += '--fail-on-warn' }
+        if ('${{ inputs.vuln }}' -eq 'true') { $args += '--vuln' }
+        if ('${{ inputs.vuln-provider }}' -ne '') { $args += @('--vuln-provider', '${{ inputs.vuln-provider }}') }
+        if ('${{ inputs.fail-on-vulnerability }}' -eq 'true') { $args += '--fail-on-vulnerability' }
+
+        dotnet run @args
