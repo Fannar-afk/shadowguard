@@ -302,7 +302,7 @@ public sealed class RiskScoringService
                 IsDirect = component.IsDirect,
                 License = component.License,
                 SourceType = component.SourceType,
-                Scope = component.IsDirect ? "required" : "transitive",
+                Scope = component.IsDirect ? "required" : "optional",
                 RiskScore = (int)Math.Round(component.RiskScore),
                 Severity = component.Severity.ToString(),
                 EvidenceFiles = component.EvidenceFilesDisplay
