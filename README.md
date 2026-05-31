@@ -276,6 +276,30 @@ dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj -- --path .\sample
   --fail-on-vulnerability
 ```
 
+### 输出 SARIF 供 GitHub Code Scanning 使用
+
+ShadowGuard CLI 支持 `--format sarif`，可将依赖风险结果输出为 SARIF 2.1.0。该格式适合上传到 GitHub Code Scanning 或其他支持 SARIF 的安全平台。
+
+```powershell
+.\shadowguard-cli.exe `
+  --path .\samples\demo-npm-risk `
+  --plugins .\plugins `
+  --format sarif `
+  --out .\artifacts\shadowguard.sarif
+```
+
+如需在 GitHub Actions 中上传 SARIF，可结合 `github/codeql-action/upload-sarif` 使用。
+
+```yaml
+- name: Run ShadowGuard
+  run: .\shadowguard-cli.exe --path . --plugins .\plugins --format sarif --out shadowguard.sarif
+
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: shadowguard.sarif
+```
+
 ### 常用参数
 
 | 参数 | 说明 |
@@ -283,7 +307,7 @@ dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj -- --path .\sample
 | `--path` / `-p` | 指定待扫描项目目录 |
 | `--plugins` | 指定本地插件规则目录 |
 | `--out` / `-o` | 指定 JSON 输出路径 |
-| `--format` | 指定输出格式，支持 `report`、`sbom`、`validation`、`vuln` |
+| `--format` | 指定输出格式，支持 `report`、`sbom`、`validation`、`vuln`、`sarif` |
 | `--validate-sbom` | 启用 CycloneDX 1.5 风格 SBOM 核心结构校验 |
 | `--fail-on-invalid-sbom` | SBOM 校验失败时返回非零退出码 |
 | `--fail-on-block` | 安全闸门结果为 Block 时返回非零退出码 |
@@ -292,6 +316,43 @@ dotnet run --project .\ShadowGuard.Cli\ShadowGuard.Cli.csproj -- --path .\sample
 | `--vuln` | 启用漏洞数据查询 |
 | `--vuln-provider` | 漏洞数据源，当前支持 `osv` |
 | `--fail-on-vulnerability` | 查询到漏洞时返回非零退出码 |
+
+## GitHub Action 集成
+
+本仓库提供 `action.yml`，可作为复合 GitHub Action 在其他仓库中调用。它会恢复 ShadowGuard 项目并运行 CLI，适合在 pull request 或发布前执行供应链风险检查。
+
+```yaml
+name: ShadowGuard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  scan:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: Fannar-afk/shadowguard@main
+        with:
+          path: .
+          plugins: plugins
+          format: sarif
+          output: shadowguard.sarif
+          validate-sbom: "true"
+          fail-on-invalid-sbom: "true"
+          fail-on-block: "true"
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: shadowguard.sarif
+```
 
 ## 作为 .NET 类库集成
 
@@ -395,6 +456,7 @@ shadowguard/
 ├─ plugins/                     本地 JSON 插件规则
 ├─ samples/                     示例项目
 ├─ tools/                       工具脚本
+├─ action.yml                   可复用 GitHub Action 入口
 └─ .github/workflows/           GitHub Actions 工作流
 ```
 
@@ -403,6 +465,7 @@ shadowguard/
 - **本地优先**：默认扫描不联网，适合本地项目和内网环境使用。
 - **可视化操作**：桌面端支持项目选择、扫描、风险查看和报告导出。
 - **自动化友好**：CLI 支持非零退出码，可接入 CI/CD 流程。
+- **平台集成**：CLI 支持 SARIF 输出，仓库提供可复用 GitHub Action 入口。
 - **规则可扩展**：通过 JSON 插件规则扩展风险识别逻辑。
 - **组件可复用**：核心能力封装为 .NET 类库，便于第三方程序集成。
 - **SBOM 支持**：可生成 CycloneDX 1.5 风格的软件物料清单。
