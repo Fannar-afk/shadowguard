@@ -1,4 +1,4 @@
-name: ShadowGuard Scan
+name: ShadowGuard
 description: Run ShadowGuard dependency risk scan in GitHub Actions.
 author: Fannar-afk
 
