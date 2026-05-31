@@ -101,12 +101,132 @@ static object BuildPayload(CliOptions options, ScanResult result, SbomValidation
         "sbom" => result.Sbom,
         "validation" => sbomValidation ?? new CycloneDxValidator().Validate(result.Sbom),
         "vuln" or "vulnerabilities" => vulnerabilityScan ?? new VulnerabilityScanResult { Provider = options.VulnerabilityProvider },
+        "sarif" => BuildSarif(result),
         _ => new ScanCliReport
         {
             Scan = result,
             SbomValidation = sbomValidation,
             VulnerabilityScan = vulnerabilityScan
         }
+    };
+}
+
+static object BuildSarif(ScanResult result)
+{
+    var rules = result.Findings
+        .GroupBy(finding => string.IsNullOrWhiteSpace(finding.RuleId) ? "shadowguard.finding" : finding.RuleId)
+        .Select(group =>
+        {
+            var sample = group.First();
+            return new
+            {
+                id = group.Key,
+                name = string.IsNullOrWhiteSpace(sample.RuleName) ? group.Key : sample.RuleName,
+                shortDescription = new { text = string.IsNullOrWhiteSpace(sample.RuleName) ? group.Key : sample.RuleName },
+                fullDescription = new { text = string.IsNullOrWhiteSpace(sample.Message) ? "ShadowGuard dependency risk finding." : sample.Message },
+                properties = new
+                {
+                    category = sample.Category,
+                    severity = sample.Severity.ToString(),
+                    maxScore = group.Max(item => item.Score)
+                }
+            };
+        })
+        .ToArray();
+
+    var findings = result.Findings
+        .Select(finding => new
+        {
+            ruleId = string.IsNullOrWhiteSpace(finding.RuleId) ? "shadowguard.finding" : finding.RuleId,
+            level = ToSarifLevel(finding.Severity),
+            message = new { text = BuildSarifMessage(finding) },
+            locations = new[]
+            {
+                new
+                {
+                    physicalLocation = new
+                    {
+                        artifactLocation = new
+                        {
+                            uri = ResolvePrimarySourceFile(result, finding)
+                        },
+                        region = new
+                        {
+                            startLine = 1
+                        }
+                    }
+                }
+            },
+            properties = new
+            {
+                dependencyName = finding.DependencyName,
+                ecosystem = finding.Ecosystem,
+                category = finding.Category,
+                severity = finding.Severity.ToString(),
+                score = finding.Score,
+                recommendation = finding.Recommendation,
+                sourceFiles = finding.SourceFiles
+            }
+        })
+        .ToArray();
+
+    return new Dictionary<string, object>
+    {
+        ["version"] = "2.1.0",
+        ["$schema"] = "https://json.schemastore.org/sarif-2.1.0.json",
+        ["runs"] = new[]
+        {
+            new
+            {
+                tool = new
+                {
+                    driver = new
+                    {
+                        name = "ShadowGuard",
+                        informationUri = "https://github.com/Fannar-afk/shadowguard",
+                        rules
+                    }
+                },
+                automationDetails = new
+                {
+                    id = "shadowguard/dependency-risk-scan"
+                },
+                results = findings
+            }
+        }
+    };
+}
+
+static string BuildSarifMessage(Finding finding)
+{
+    var dependency = string.IsNullOrWhiteSpace(finding.DependencyName) ? "dependency" : finding.DependencyName;
+    var message = string.IsNullOrWhiteSpace(finding.Message) ? finding.RuleName : finding.Message;
+    var recommendation = string.IsNullOrWhiteSpace(finding.Recommendation) ? string.Empty : " Recommendation: " + finding.Recommendation;
+    return $"{dependency}: {message}{recommendation}";
+}
+
+static string ResolvePrimarySourceFile(ScanResult result, Finding finding)
+{
+    var source = finding.SourceFiles
+        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .FirstOrDefault();
+
+    if (string.IsNullOrWhiteSpace(source))
+    {
+        source = result.TargetPath;
+    }
+
+    return source.Replace('\\', '/');
+}
+
+static string ToSarifLevel(SeverityLevel severity)
+{
+    return severity switch
+    {
+        SeverityLevel.Critical or SeverityLevel.High => "error",
+        SeverityLevel.Medium => "warning",
+        SeverityLevel.Low => "note",
+        _ => "none"
     };
 }
 
@@ -193,7 +313,6 @@ static string ReadValue(string[] args, ref int index, string optionName)
     {
         throw new ArgumentException($"Missing value for {optionName}");
     }
-
     index++;
     return args[index];
 }
@@ -203,13 +322,13 @@ static void PrintHelp()
     Console.WriteLine("ShadowGuard CLI");
     Console.WriteLine();
     Console.WriteLine("Usage:");
-    Console.WriteLine("  shadowguard-cli --path <project-dir> [--plugins <plugin-dir>] [--out <file>] [--format report|sbom|validation|vuln]");
+    Console.WriteLine("  shadowguard-cli --path <project-dir> [--plugins <plugin-dir>] [--out <file>] [--format report|sbom|validation|vuln|sarif]");
     Console.WriteLine();
     Console.WriteLine("Options:");
     Console.WriteLine("  -p, --path <dir>             Project directory to scan.");
     Console.WriteLine("      --plugins <dir>         Optional plugin rule directory.");
     Console.WriteLine("  -o, --out <file>            Write JSON output to a file. Defaults to stdout.");
-    Console.WriteLine("      --format <format>       Output format: report, sbom, validation, or vuln. Default: report.");
+    Console.WriteLine("      --format <format>       Output format: report, sbom, validation, vuln, or sarif. Default: report.");
     Console.WriteLine("      --validate-sbom         Validate generated CycloneDX SBOM structure and required fields.");
     Console.WriteLine("      --fail-on-invalid-sbom  Return non-zero exit code when SBOM validation fails.");
     Console.WriteLine("      --vuln                  Query vulnerability data. Currently supports OSV.");
