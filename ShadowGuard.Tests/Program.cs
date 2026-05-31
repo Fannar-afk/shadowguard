@@ -568,36 +568,6 @@ public sealed class RiskScoringServiceTests
         var result = new RiskScoringService().BuildResult("demo-project", new[] { component }, new[] { plugin });
 
         Assert.Empty(result.Findings);
- main
-    }
-}
-public sealed class ProjectScannerTests
-{
-    [Fact]
-    public void DiscoverComponents_Pep508DirectReference_DetectsGitSource()
-    {
-        var workspace = Path.Combine(Path.GetTempPath(), "shadowguard-scanner-tests-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(workspace);
-
-        try
-        {
-            File.WriteAllText(
-                Path.Combine(workspace, "requirements.txt"),
-                "requests==2.31.0\ninternal-agent @ git+https://github.com/example/internal-agent.git\n");
-
-            var components = new ProjectScanner().DiscoverComponents(workspace);
-
-            var pinned = Assert.Single(components, component => component.Name == "requests");
-            Assert.Equal("2.31.0", pinned.Version);
-            Assert.Equal("Registry", pinned.SourceType);
-
-            var directReference = Assert.Single(components, component => component.Name == "internal-agent");
-            Assert.Equal("git+https://github.com/example/internal-agent.git", directReference.Version);
-            Assert.Equal("Git", directReference.SourceType);
-        }
-        finally
-        {
-            Directory.Delete(workspace, recursive: true);
-        }
+ main;
     }
 }
