@@ -285,7 +285,7 @@ public sealed class CycloneDxValidatorTests
     }
 }
 
-fix/pep508-direct-reference-requirements
+
 public sealed class ProjectScannerTests
 {
     [Fact]
@@ -314,7 +314,8 @@ public sealed class ProjectScannerTests
         {
             Directory.Delete(workspace, recursive: true);
         }
-
+    }
+}
 public sealed class RiskScoringServiceTests
 {
     private static ScanResult Scan(DependencyComponent component)
